@@ -1,0 +1,294 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA 智能体优化后台</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f0f2f5; color:#333; }
+.header { background:linear-gradient(135deg,#1a73e8,#0d47a1); color:#fff; padding:20px 32px; }
+.header h1 { font-size:22px; }
+.header p { opacity:.8; font-size:13px; margin-top:4px; }
+.container { max-width:1200px; margin:0 auto; padding:20px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.card { background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.08); overflow:hidden; }
+.card-header { padding:14px 20px; border-bottom:1px solid #eee; font-weight:600; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
+.card-body { padding:16px 20px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; color:#555; }
+.form-group input,.form-group textarea,.form-group select { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:13px; }
+.form-group textarea { resize:vertical; min-height:60px; font-family:monospace; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 18px; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:500; transition:.2s; }
+.btn-primary { background:#1a73e8; color:#fff; }
+.btn-primary:hover { background:#1557b0; }
+.btn-success { background:#0d904f; color:#fff; }
+.btn-success:hover { background:#0a6e3a; }
+.btn-danger { background:#d93025; color:#fff; }
+.btn-danger:hover { background:#b3261e; }
+.btn-outline { background:#fff; color:#1a73e8; border:1px solid #1a73e8; }
+.btn-sm { padding:4px 10px; font-size:12px; }
+.status-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+.status-ok { background:#e6f4ea; color:#0d904f; }
+.status-err { background:#fce8e6; color:#d93025; }
+.status-empty { background:#fef7e0; color:#b06000; }
+.metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.metric { background:#fff; border-radius:8px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.metric-value { font-size:28px; font-weight:700; color:#1a73e8; }
+.metric-label { font-size:12px; color:#888; margin-top:4px; }
+.full-width { grid-column:1/-1; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:10px 14px; text-align:left; border-bottom:1px solid #eee; font-size:13px; }
+th { background:#fafafa; font-weight:600; color:#555; }
+.tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; margin:2px; }
+.tag-high { background:#fce8e6; color:#d93025; }
+.tag-mid { background:#fef7e0; color:#b06000; }
+.tag-low { background:#e8f5e9; color:#2e7d32; }
+.loading { text-align:center; padding:40px; color:#888; }
+.loading::after { content:"..."; animation:dots 1.5s infinite; }
+@keyframes dots { 0%,20%{content:"."} 40%{content:".."} 60%,100%{content:"..."} }
+.log-area { max-height:200px; overflow-y:auto; background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:6px; font-family:monospace; font-size:12px; }
+.log-area .log-ok { color:#6a9955; }
+.log-area .log-err { color:#f44747; }
+.log-area .log-empty { color:#ce9178; }
+.checklist { margin:6px 0 0 16px; }
+.checklist li { font-size:12px; color:#666; margin:2px 0; }
+.progress-bar { height:6px; background:#e8e8e8; border-radius:3px; overflow:hidden; margin-top:6px; }
+.progress-fill { height:100%; border-radius:3px; transition:.3s; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔍 QA 智能体优化后台</h1>
+  <p>抓取 Agent Trace 数据 → 话题分析 → 生成 QA 规则</p>
+</div>
+
+<div class="container">
+
+  <!-- 指标概览 -->
+  <div class="metrics" id="metrics">
+    <div class="metric"><div class="metric-value" id="mTraces">0</div><div class="metric-label">已抓取 Trace</div></div>
+    <div class="metric"><div class="metric-value" id="mTopics">0</div><div class="metric-label">识别话题类别</div></div>
+    <div class="metric"><div class="metric-value" id="mRules">0</div><div class="metric-label">生成 QA 规则</div></div>
+    <div class="metric"><div class="metric-value" id="mScore">-</div><div class="metric-label">平均 QA 评分</div></div>
+  </div>
+
+  <div class="grid">
+    <!-- 左侧: 配置 + 抓取 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">⚙️ API 配置</div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>API 地址</label>
+            <input id="cfgApiUrl" value="https://agent.tanyuai.com/api/im/agent-trace/paginateV2">
+          </div>
+          <div class="form-group">
+            <label>Authorization Token</label>
+            <input id="cfgToken" placeholder="Bearer token（选填）">
+          </div>
+          <div class="form-group">
+            <label>Cookie（从浏览器 DevTools 复制）</label>
+            <textarea id="cfgCookie" placeholder="粘贴完整 Cookie 字符串"></textarea>
+          </div>
+          <div class="form-group">
+            <label>额外请求参数（JSON）</label>
+            <textarea id="cfgExtraParams" placeholder='{"storeId":"xxx","tenantId":"xxx"}'>{"pageNo":1,"pageSize":20}</textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="loadConfig()">🔄 加载已保存配置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">📥 数据抓取</div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>每页条数</label>
+            <input id="fetchPageSize" type="number" value="50" min="1" max="200">
+          </div>
+          <div class="form-group">
+            <label>最大页数</label>
+            <input id="fetchMaxPages" type="number" value="10" min="1" max="100">
+          </div>
+          <button class="btn btn-success" onclick="fetchData()">🚀 开始抓取</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="analyzeData()">📊 话题分析</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="generateQA()">📋 生成 QA 规则</button>
+          <div id="fetchLog" class="log-area" style="margin-top:12px;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧: 结果展示 -->
+    <div>
+      <div class="card" style="margin-bottom:20px" id="topicCard">
+        <div class="card-header">📊 话题分布</div>
+        <div class="card-body" id="topicBody">
+          <p style="color:#888;font-size:13px">请先抓取数据并执行话题分析</p>
+        </div>
+      </div>
+
+      <div class="card" id="qaCard">
+        <div class="card-header">📋 生成的 QA 规则</div>
+        <div class="card-body" id="qaBody">
+          <p style="color:#888;font-size:13px">请先执行「生成 QA 规则」</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "";
+
+async function apiGet(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+async function apiPost(url, data) {
+  const r = await fetch(url, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(data)
+  });
+  return r.json();
+}
+
+// ── 配置 ──
+async function saveConfig() {
+  const cfg = {
+    apiUrl: document.getElementById("cfgApiUrl").value,
+    token: document.getElementById("cfgToken").value,
+    cookie: document.getElementById("cfgCookie").value,
+  };
+  try {
+    const extra = JSON.parse(document.getElementById("cfgExtraParams").value || "{}");
+    cfg.extraParams = extra;
+  } catch(e) {
+    alert("额外参数 JSON 格式错误: " + e.message);
+    return;
+  }
+  const r = await apiPost("/api/config", cfg);
+  alert(r.msg || "配置已保存");
+}
+
+async function loadConfig() {
+  const r = await apiGet("/api/config");
+  if (r.apiUrl) document.getElementById("cfgApiUrl").value = r.apiUrl;
+  if (r.token) document.getElementById("cfgToken").value = r.token || "";
+  if (r.has_auth) document.getElementById("cfgCookie").placeholder = "已保存（不显示内容）";
+  alert("配置已加载");
+}
+
+// ── 抓取 ──
+async function fetchData() {
+  const logEl = document.getElementById("fetchLog");
+  logEl.style.display = "block";
+  logEl.innerHTML = '<span style="color:#dcdcaa">⏳ 正在抓取数据...</span>';
+
+  const r = await apiPost("/api/fetch", {
+    pageSize: parseInt(document.getElementById("fetchPageSize").value),
+    maxPages: parseInt(document.getElementById("fetchMaxPages").value),
+  });
+
+  let html = "";
+  if (r.log) {
+    r.log.forEach(l => {
+      if (l.status === "ok") html += `<span class="log-ok">✅ 第${l.page}页: ${l.count}条 (共${l.total}条)</span>\n`;
+      else if (l.status === "error") html += `<span class="log-err">❌ 第${l.page}页: ${l.msg}</span>\n`;
+      else html += `<span class="log-empty">📭 第${l.page}页: 无数据</span>\n`;
+    });
+  }
+  html += `\n<span style="color:#4ec9b0">📦 本次新增 ${r.totalFetched} 条，累计存储 ${r.totalStored} 条</span>`;
+  logEl.innerHTML = html.replace(/\n/g,"<br>");
+  refreshOverview();
+}
+
+// ── 分析 ──
+async function analyzeData() {
+  const body = document.getElementById("topicBody");
+  body.innerHTML = '<div class="loading">分析中</div>';
+
+  const r = await apiPost("/api/analyze", {});
+  if (!r.success) { body.innerHTML = `<p style="color:red">${r.data?.error || "分析失败"}</p>`; return; }
+
+  const d = r.data;
+  if (d.error) { body.innerHTML = `<p style="color:red">${d.error}</p>`; return; }
+
+  let html = '<table><tr><th>话题</th><th>数量</th><th>占比</th><th>趋势</th></tr>';
+  d.topicDistribution.forEach(t => {
+    const color = t.percentage > 20 ? "#d93025" : t.percentage > 10 ? "#b06000" : "#2e7d32";
+    html += `<tr>
+      <td><strong>${t.topic}</strong></td>
+      <td>${t.count}</td>
+      <td>${t.percentage}%</td>
+      <td><div class="progress-bar"><div class="progress-fill" style="width:${t.percentage}%;background:${color}"></div></div></td>
+    </tr>`;
+  });
+  html += "</table>";
+
+  // 高频词
+  if (d.topKeywords && d.topKeywords.length > 0) {
+    html += '<p style="margin-top:12px;font-size:13px;color:#555"><strong>高频关键词:</strong> ';
+    html += d.topKeywords.slice(0,15).map(w => `<span class="tag tag-low">${w.word}(${w.count})</span>`).join(" ");
+    html += "</p>";
+  }
+
+  // QA 评分
+  if (d.qaScoreStats && d.qaScoreStats.count > 0) {
+    html += `<p style="margin-top:8px;font-size:13px;color:#555"><strong>QA 评分:</strong> 平均 ${d.qaScoreStats.average} | 最低 ${d.qaScoreStats.min} | 最高 ${d.qaScoreStats.max} (${d.qaScoreStats.count}条)</p>`;
+  }
+
+  body.innerHTML = html;
+  refreshOverview();
+}
+
+// ── QA 规则生成 ──
+async function generateQA() {
+  const body = document.getElementById("qaBody");
+  body.innerHTML = '<div class="loading">生成中</div>';
+
+  const r = await apiPost("/api/generate-qa", {});
+  if (!r.success) { body.innerHTML = `<p style="color:red">生成失败</p>`; return; }
+
+  const d = r.data;
+  if (d.error) { body.innerHTML = `<p style="color:red">${d.error}</p>`; return; }
+
+  let html = `<p style="font-size:13px;color:#555;margin-bottom:12px">共生成 <strong>${d.totalRules}</strong> 条 QA 规则</p>`;
+
+  d.rules.forEach(rule => {
+    const priTag = rule.priority === "高" ? "tag-high" : rule.priority === "中" ? "tag-mid" : "tag-low";
+    html += `<div style="margin-bottom:16px;padding:12px;background:#fafafa;border-radius:6px;border-left:3px solid #1a73e8">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:600;font-size:13px">${rule.id} ${rule.category}</span>
+        <span class="tag ${priTag}">${rule.priority}优先级</span>
+      </div>
+      <p style="font-size:13px;color:#555;margin:8px 0">${rule.rule}</p>
+      <p style="font-size:11px;color:#888;margin:4px 0">触发条件: ${rule.trigger}</p>
+      <ul class="checklist">${rule.checklist.map(c => `<li>${c}</li>`).join("")}</ul>
+    </div>`;
+  });
+
+  body.innerHTML = html;
+  refreshOverview();
+}
+
+// ── 概览 ──
+async function refreshOverview() {
+  const r = await apiGet("/api/overview");
+  document.getElementById("mTraces").textContent = r.totalTraces;
+  const ana = await apiPost("/api/analyze", {});
+  if (ana.success && ana.data && ana.data.topicDistribution) {
+    document.getElementById("mTopics").textContent = ana.data.topicDistribution.length;
+    document.getElementById("mScore").textContent = ana.data.qaScoreStats?.average || "-";
+  }
+}
+
+// 页面加载
+refreshOverview();
+loadConfig();
+</script>
+</body>
+</html>

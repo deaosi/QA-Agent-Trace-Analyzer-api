@@ -1,0 +1,13 @@
+.pydeps/
+__pycache__/
+*.pyc
+111/.cookies.json
+111/.shops.json
+111/.issue_status.json
+111/.users.json
+111/server.log
+data/
+*.log
+*.pid
+.env
+.venv/

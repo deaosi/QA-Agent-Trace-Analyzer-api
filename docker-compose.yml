@@ -1,0 +1,15 @@
+services:
+  qa-agent-workbench:
+    build: .
+    container_name: qa-agent-workbench
+    restart: unless-stopped
+    ports:
+      - "${QA_PORT:-5000}:5000"
+    environment:
+      QA_ADMIN_USERNAME: "${QA_ADMIN_USERNAME:-admin}"
+      QA_ADMIN_PASSWORD: "${QA_ADMIN_PASSWORD:-${QA_ACCESS_PASSWORD}}"
+      QA_ACCESS_PASSWORD: "${QA_ACCESS_PASSWORD}"
+      QA_SECRET_KEY: "${QA_SECRET_KEY}"
+      QA_DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
