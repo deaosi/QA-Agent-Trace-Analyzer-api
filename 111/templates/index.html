@@ -844,49 +844,54 @@ async function loadIssueDetail(issueId){
     return;
   }
 
-  // Render chat-like detail view
-  let html = '<div style="padding:16px">';
-  html += '<div style="font-weight:750;font-size:14px;margin-bottom:12px;color:#101828">' + escapeHtml(issue.standardQuestion) + '</div>';
-  html += '<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
+  // Render chat-like timeline view (matching screenshot style)
+  let html = '<div style="padding:12px 0">';
+
+  // Header with issue info
+  html += '<div style="padding:10px 12px;background:#f8fafc;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px">';
+  html += '<span style="font-weight:750;color:#101828">' + escapeHtml(issue.standardQuestion) + '</span>';
   html += `<span class="badge ${priorityClass(issue.priority)}">${escapeHtml(issue.priority)}</span>`;
   html += `<span class="badge issue-type">${escapeHtml(issue.issueType)}</span>`;
-  html += `<span class="badge risk-${issue.adoptionRisk >= 70 ? 'high' : issue.adoptionRisk >= 45 ? 'mid' : 'low'}">风险 ${issue.adoptionRisk}%</span>`;
   html += `<span class="badge issue-status">${escapeHtml(issue.status || "待处理")}</span>`;
   html += '</div>';
 
-  // Chat timeline
-  html += '<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden">';
-  html += '<div style="padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:12px;color:#475467;font-weight:650">聊天记录（共 ' + r.records.length + ' 条）</div>';
+  // Chat area
+  html += '<div style="padding:16px;overflow:auto;max-height:70vh" id="chattimeline_' + issueId + '">';
 
   r.records.forEach(rec => {
-    html += '<div style="padding:12px;border-bottom:1px solid var(--line)">';
-    // Meta header
-    html += '<div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap;font-size:11px;color:var(--muted)">';
-    html += '<span>🕐 ' + escapeHtml(rec.time) + '</span>';
-    html += '<span>👤 ' + escapeHtml(rec.buyer || "-") + '</span>';
-    if(rec.product) html += '<span>📦 ' + escapeHtml(rec.product) + '</span>';
-    html += '<span>Trace: ' + escapeHtml(rec.id || "-") + '</span>';
+    // Conversation card
+    html += '<div style="margin-bottom:20px">';
+
+    // Header: trace info
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:var(--muted)">';
+    html += '<span title="' + escapeHtml(rec.buyer || "-") + '">' + escapeHtml((rec.buyer || "-").substring(0, 16)) + (rec.buyer && rec.buyer.length > 16 ? '...' : '') + '</span>';
+    html += '<span>›</span>';
+    html += '<span>' + escapeHtml(rec.time) + '</span>';
+    if(rec.product){
+      html += '<span>›</span>';
+      html += '<span title="' + escapeHtml(rec.product) + '">' + escapeHtml(rec.product.substring(0, 20)) + '</span>';
+    }
     html += '</div>';
 
-    // Question
+    // Left: buyer question
     if(rec.question && rec.question !== "-"){
-      html += '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:8px 10px;margin-bottom:6px">';
-      html += '<div style="font-size:11px;color:#0369a1;font-weight:650;margin-bottom:3px">买家提问</div>';
-      html += '<div style="color:#1e293b;font-size:12px;white-space:pre-wrap">' + escapeHtml(rec.question) + '</div>';
+      html += '<div style="display:flex;gap:8px;margin-bottom:10px">';
+      html += '<div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">买</div>';
+      html += '<div style="background:#f1f5f9;border-radius:8px;padding:8px 12px;max-width:80%;font-size:13px;line-height:1.6;color:#1e293b;word-break:break-word">' + escapeHtml(rec.question) + '</div>';
       html += '</div>';
     }
 
-    // Answer
+    // Right: agent reply
     if(rec.answer && rec.answer !== "-"){
-      html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px">';
-      html += '<div style="font-size:11px;color:#15803d;font-weight:650;margin-bottom:3px">智能体回复</div>';
-      html += '<div style="color:#1e293b;font-size:12px;white-space:pre-wrap">' + escapeHtml(rec.answer) + '</div>';
+      html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px">';
+      html += '<div style="background:#dcfce7;border-radius:8px;padding:8px 12px;max-width:80%;font-size:13px;line-height:1.6;color:#1e293b;word-break:break-word">' + escapeHtml(rec.answer) + '</div>';
+      html += '<div style="width:28px;height:28px;border-radius:50%;background:#bbf7d0;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">客</div>';
       html += '</div>';
     }
 
-    // Topic
+    // Topic badge
     if(rec.topic){
-      html += '<div style="margin-top:6px;font-size:11px;color:var(--muted)">话题：' + escapeHtml(rec.topic) + '</div>';
+      html += '<div style="font-size:11px;color:var(--muted);margin-top:2px;padding-left:36px">话题：' + escapeHtml(rec.topic) + '</div>';
     }
 
     html += '</div>';
