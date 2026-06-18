@@ -1512,6 +1512,80 @@ def chat_records():
     })
 
 
+@app.route("/api/issue-detail", methods=["GET", "POST"])
+@require_auth
+def issue_detail():
+    """Fetch detailed chat records for a specific issue (by trace IDs)."""
+    if request.method == "GET":
+        shop_id = request.args.get("shopId", "").strip()
+        trace_ids_str = request.args.get("traceIds", "")
+    else:
+        data = request.get_json() or {}
+        shop_id = str(data.get("shopId", "")).strip()
+        trace_ids_str = data.get("traceIds", "")
+
+    if not shop_id or not trace_ids_str:
+        return jsonify({"success": False, "error": "缺少参数"})
+    trace_ids = [tid.strip() for tid in trace_ids_str.split(",") if tid.strip()]
+    if not trace_ids:
+        return jsonify({"success": False, "error": "没有trace ID"})
+
+    traces = load_json(data_file(shop_id), [])
+    if not traces:
+        return jsonify({"success": False, "error": "没有数据"})
+
+    # Filter to only matching trace IDs, preserve order
+    id_set = set(trace_ids)
+    records = []
+    seen = set()
+    for record in traces:
+        if not isinstance(record, dict):
+            continue
+        tid = str(record.get("id", ""))
+        if tid not in id_set or tid in seen:
+            continue
+        seen.add(tid)
+        question, answer = parse_conversation(record)
+        buyer = record.get("buyerAccount", "")
+        seller = record.get("sellerAccount", "")
+        topic = record.get("topicName", "")
+        product_info = record.get("productInfo", {}) if isinstance(record.get("productInfo"), dict) else {}
+        product_title = product_info.get("spuTitle", "") or product_info.get("title", "") or ""
+        sku_id = product_info.get("skuId", "") or ""
+        spu_id = product_info.get("spuId", "") or ""
+        ts = record.get("time", 0)
+        try:
+            dt_str = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            dt_str = str(ts)
+        identity = extract_trace_identity(record)
+
+        records.append({
+            "id": tid,
+            "time": dt_str,
+            "buyer": buyer[:60],
+            "buyerAlias": buyer[:30],
+            "seller": seller[:60],
+            "topic": topic[:50],
+            "product": product_title[:80],
+            "spu": spu_id,
+            "sku": sku_id,
+            "question": question[:500],
+            "answer": answer[:1000],
+            "status": record.get("status", ""),
+            "type": record.get("type", ""),
+            "identity": identity,
+            "rawTime": ts,
+        })
+
+    # Sort by time descending
+    records.sort(key=lambda r: r.get("rawTime", 0), reverse=True)
+    for r in records:
+        r.pop("rawTime", None)
+
+    return jsonify({"success": True, "records": records})
+
+
 @app.route("/api/issue-status", methods=["POST"])
 @require_auth
 def update_issue_status():
