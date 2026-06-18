@@ -1,5 +1,7 @@
 """QA Agent Trace Analyzer."""
 
+import csv
+import io
 import json
 import os
 import re
@@ -10,7 +12,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import requests
-from flask import Flask, jsonify, redirect, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 try:
@@ -215,877 +217,7 @@ def normalize_datetime(value, fallback):
     return value
 
 
-HTML = r"""<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QA Agent Trace Analyzer</title>
-<style>
-:root{
-  --bg:#f3f6fb;--panel:#fff;--line:#dfe5ee;--line-strong:#cbd5e1;
-  --text:#172033;--muted:#64748b;--primary:#1677ff;--primary-dark:#0958d9;
-  --danger:#d92d20;--success:#039855;--warn:#dc6803;--indigo:#4f46e5;
-  --shadow:0 1px 2px rgba(16,24,40,.04);--shadow-lg:0 12px 30px rgba(15,23,42,.08)
-}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;font-size:13px}
-.topbar{height:60px;background:#101828;color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #1f2937;box-shadow:0 8px 24px rgba(16,24,40,.16)}
-.brand{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:760}.brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1677ff,#4f46e5);display:grid;place-items:center;font-weight:800;box-shadow:0 8px 18px rgba(22,119,255,.32)}
-.top-meta{color:#cbd5e1;font-size:12px}.page{max-width:1320px;margin:0 auto;padding:18px 20px 28px}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}.metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#1677ff}.metric:nth-child(3)::before{background:#039855}.metric:nth-child(4)::before{background:#4f46e5}
-.metric-value{font-size:27px;line-height:1;font-weight:780;color:#0f172a}.metric-label{font-size:12px;color:var(--muted);margin-top:8px}.metric:nth-child(2) .metric-value{color:#1677ff}.metric:nth-child(3) .metric-value{color:#039855}
-.layout{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}.stack{display:flex;flex-direction:column;gap:14px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}.card-header{height:46px;padding:0 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#fff,#fbfcfe);font-weight:750}
-.card-body{padding:14px 16px}.section-title{font-size:12px;color:#475467;font-weight:700;margin:2px 0 10px}.divider{height:1px;background:var(--line);margin:14px 0}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.filter-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px 12px}.action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:12px;color:#475467;font-weight:650}
-input,select,textarea{width:100%;border:1px solid var(--line-strong);border-radius:6px;background:white;color:var(--text);font:inherit;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s}
-input,select{height:32px;padding:0 9px}textarea{min-height:76px;resize:vertical;padding:8px 9px;font-family:Consolas,"SFMono-Regular",monospace;line-height:1.5}
-input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(22,119,255,.12)}
-.btn{height:32px;border:1px solid var(--line-strong);border-radius:6px;padding:0 12px;background:#fff;color:#1f2937;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
-.btn:hover{border-color:var(--primary);color:var(--primary)}.btn-primary{background:var(--primary);border-color:var(--primary);color:white}.btn-primary:hover{background:var(--primary-dark);border-color:var(--primary-dark);color:white}
-.btn-danger{background:#fff;border-color:#fda29b;color:var(--danger)}.btn-danger:hover{background:#fff5f5;border-color:var(--danger);color:var(--danger)}.btn-sm{height:28px;padding:0 10px;font-size:12px}
-.status{font-size:12px;color:var(--muted)}.pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:650}
-.checkbar{display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#f8fafc}.checkbar label{display:inline-flex;align-items:center;gap:6px;color:#344054}
-input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}.progress{display:none;margin-top:14px}.progress-track{height:7px;background:#e4e7ec;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:var(--primary);transition:width .2s}.progress-meta{display:flex;justify-content:space-between;margin-top:5px;font-size:12px;color:var(--muted)}
-.log{display:none;white-space:pre-wrap;margin-top:12px;max-height:220px;overflow:auto;background:#0f172a;color:#d1d5db;padding:12px;border-radius:6px;font:12px/1.6 Consolas,monospace}
-.result-card{margin-top:14px}.result-title{font-size:14px;font-weight:750;margin:0 0 8px}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:8px;background:#fbfcfe}
-.diagnosis-grid{display:grid;grid-template-columns:1.1fr repeat(4,1fr);gap:10px;margin-bottom:14px}.diagnosis-main{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:10px;padding:16px;box-shadow:var(--shadow-lg)}.score{font-size:34px;font-weight:820;line-height:1}.score-label{color:#cbd5e1;margin-top:6px}.diagnosis-card{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fff}.diagnosis-value{font-size:22px;font-weight:780}.diagnosis-label{color:var(--muted);font-size:12px;margin-top:4px}.diagnosis-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.summary-box{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px}.summary-box b{display:block;margin-bottom:6px}.summary-box ul{margin:0;padding-left:18px;color:#475467;line-height:1.7}
-.task-list{display:grid;gap:8px}.task-item{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 10px}.task-type{display:inline-flex;height:22px;align-items:center;padding:0 7px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:750}.value-score{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f5f3ff;color:#5b21b6;font-size:12px;font-weight:750}
-.topic-dashboard{margin:14px 0 18px}.topic-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px}.topic-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-kpi strong{font-size:22px;display:block}.topic-kpi span{font-size:12px;color:var(--muted)}.topic-layout{display:grid;grid-template-columns:1.2fr .8fr;gap:10px}.topic-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-panel-title{font-weight:780;margin-bottom:10px}.rank-row{display:grid;grid-template-columns:110px 1fr 72px;gap:10px;align-items:center;margin:10px 0}.rank-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rank-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.rank-fill{height:100%;background:linear-gradient(90deg,#1677ff,#4f46e5);border-radius:999px}.rank-meta{text-align:right;color:#475467;font-size:12px}.topic-heat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.heat-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fbfcfe}.heat-title{font-weight:750}.heat-sub{color:var(--muted);font-size:12px;margin-top:4px}.heat-risk{margin-top:8px;font-weight:800}.keyword-cloud{display:flex;gap:6px;flex-wrap:wrap}.keyword{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;background:#f2f4f7;color:#344054;font-weight:650;font-size:12px}
-.identity-dashboard{margin:0 0 18px}.identity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}.identity-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-kpi strong{font-size:22px;display:block}.identity-kpi span{font-size:12px;color:var(--muted)}.identity-layout{display:grid;grid-template-columns:1fr 1fr;gap:10px}.identity-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-list{display:grid;gap:8px}.identity-row{display:grid;grid-template-columns:minmax(0,1fr) 70px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;padding:9px}.identity-name{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.identity-meta{font-size:12px;color:var(--muted);margin-top:3px;word-break:break-all}.identity-count{text-align:right;font-weight:800;color:#175cd3}.trace-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.trace-chip{display:inline-flex;max-width:220px;height:22px;align-items:center;padding:0 7px;border-radius:6px;background:#f2f4f7;color:#344054;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.knowledge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 18px}.knowledge-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px;box-shadow:var(--shadow)}.knowledge-title{font-weight:780;color:#101828;margin-bottom:8px}.knowledge-line{font-size:12px;color:#475467;line-height:1.55;margin-top:6px}.kw{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:999px;background:#eef4ff;color:#175cd3;margin:3px 4px 0 0;font-size:12px;font-weight:650}
-table{width:100%;border-collapse:collapse;margin-top:8px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;vertical-align:top}th{color:#475467;background:#f8fafc;font-weight:700}
-.topic-bar{height:6px;background:#e4e7ec;border-radius:999px;overflow:hidden;margin-top:5px}.topic-fill{height:100%;background:var(--primary)}.qa-q{font-weight:650;color:#0958d9}.qa-a{color:#334155;white-space:pre-wrap}.qa-a,.issue-suggestion{max-height:92px;overflow:auto;padding-right:4px}
-.issue-panel{margin-bottom:18px}.issue-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}.issue-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.issue-tools select{width:120px}.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}.badge-high{background:#fef3f2;color:#b42318}.badge-mid{background:#fffaeb;color:#b54708}.badge-low{background:#ecfdf3;color:#027a48}.issue-type{background:#eef4ff;color:#175cd3}.issue-status{background:#f2f4f7;color:#344054}.risk-high{background:#fef3f2;color:#b42318}.risk-mid{background:#fff7ed;color:#c2410c}.risk-low{background:#ecfdf3;color:#027a48}.issue-question{font-weight:750;color:#101828}.issue-meta{margin-top:4px;color:var(--muted);font-size:12px}.issue-reason{color:#7a271a;font-size:12px;margin-top:5px}.issue-suggestion{color:#344054;font-size:12px;line-height:1.5;margin-top:5px}.mini-actions{display:flex;gap:6px;flex-wrap:wrap}.mini-actions .btn{height:26px;padding:0 8px;font-size:12px}
-.qa-panel{margin-top:18px}.qa-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.qa-count{font-size:12px;color:var(--muted);font-weight:500}.qa-topic{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f2f4f7;color:#344054;font-size:12px;font-weight:650}.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}.pager-total{color:#475467;font-size:12px;margin-right:auto}.pager-pages{display:grid;grid-template-columns:repeat(7,32px);gap:4px}.page-btn{height:30px;min-width:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:#344054;font-weight:650;cursor:pointer}.page-btn:hover{border-color:var(--primary);color:var(--primary)}.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}.page-btn:disabled{cursor:not-allowed;opacity:.45;border-color:var(--line);color:var(--muted)}.page-ellipsis{height:30px;display:grid;place-items:center;color:var(--muted);font-weight:700}.pager-jump{display:flex;align-items:center;gap:6px;color:#475467;font-size:12px}.pager-jump input{width:48px;height:30px;text-align:center}.pager-size{height:30px;width:auto;min-width:92px}
-.cookie-output{min-height:92px}.muted-line{color:var(--muted);font-size:12px;margin-top:6px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
-@media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}}
-</style>
-</head>
-<body>
-<header class="topbar">
-  <div class="brand"><div class="brand-mark">QA</div><span>店铺智能体训练工作台</span></div>
-  <div class="top-meta"><span id="adminLink" style="display:none"><a href="/admin/users" style="color:#4ade80;text-decoration:none;margin-right:12px">账号后台</a></span><a href="/logout" style="color:#f87171;text-decoration:none;margin-left:12px">退出登录</a></div>
-</header>
-<main class="page">
-  <section class="metrics">
-    <div class="metric"><div class="metric-value" id="m1">0</div><div class="metric-label">已抓取 Trace</div></div>
-    <div class="metric"><div class="metric-value" id="m2">0</div><div class="metric-label">识别话题</div></div>
-    <div class="metric"><div class="metric-value" id="m3">0</div><div class="metric-label">待补知识卡片</div></div>
-    <div class="metric"><div class="metric-value" id="m4">-</div><div class="metric-label">采纳风险/当前店铺</div></div>
-  </section>
 
-  <section class="layout">
-    <aside class="stack">
-      <section class="card">
-        <div class="card-header"><span>Cookie 拼接助手</span><span id="shopStatus" class="pill">未检测</span></div>
-        <div class="card-body">
-          <div class="field">
-            <label>Cookie 表格</label>
-            <textarea id="cookieRaw" placeholder="Name&#9;Value&#9;Domain"></textarea>
-          </div>
-          <div class="toolbar">
-            <div class="action-row">
-              <button class="btn btn-primary btn-sm" onclick="buildCookie()">拼接并复制</button>
-              <button class="btn btn-sm" onclick="clearCookieRaw()">清空</button>
-            </div>
-            <span id="cookieMsg" class="status"></span>
-          </div>
-          <div class="divider"></div>
-          <div class="field">
-            <label>Cookie 字符串</label>
-            <textarea id="cookie" class="cookie-output" placeholder="name=value; name2=value2"></textarea>
-          </div>
-          <div class="toolbar">
-            <div class="action-row">
-              <button class="btn btn-primary btn-sm" onclick="saveCookie()">保存 Cookie</button>
-              <button class="btn btn-sm" onclick="copyCookie()">复制</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-header">店铺管理</div>
-        <div class="card-body">
-          <div class="field">
-            <label>已保存店铺</label>
-            <select id="shopSelect" onchange="switchShop()"><option value="">-- 选择店铺 --</option></select>
-          </div>
-          <div class="grid-2" style="margin-top:10px">
-            <div class="field"><label>店铺 ID</label><input id="shopId" placeholder="thirdShopId"></div>
-            <div class="field"><label>探测页大小</label><input id="probePageSize" value="1" type="number" min="1"></div>
-          </div>
-          <div class="action-row" style="margin-top:10px">
-            <button class="btn btn-primary btn-sm" onclick="probeCurrentShop()">探测店铺</button>
-            <button class="btn btn-danger btn-sm" onclick="delShop()">删除</button>
-          </div>
-          <div class="divider"></div>
-          <div class="field">
-            <label>批量店铺 ID</label>
-            <textarea id="batchIds" placeholder="2605317072510000690"></textarea>
-          </div>
-          <div class="toolbar">
-            <button class="btn btn-sm" onclick="batchProbe()">批量探测</button>
-            <span id="batchStatus" class="status"></span>
-          </div>
-        </div>
-      </section>
-    </aside>
-
-    <section class="stack">
-      <section class="card">
-        <div class="card-header">
-          <span>后台筛选</span>
-          <span class="status">请求参数与 Agent Trace 列表对齐</span>
-        </div>
-        <div class="card-body">
-          <div class="filter-grid">
-            <div class="field"><label>开始时间</label><input type="datetime-local" id="beginTime"></div>
-            <div class="field"><label>结束时间</label><input type="datetime-local" id="endTime"></div>
-            <div class="field"><label>处理状态</label><select id="fReviewStatus"><option value="" selected>全部</option><option value="0">待审核</option><option value="1">已审核</option><option value="2">已处理</option></select></div>
-            <div class="field"><label>标记状态</label><select id="fIfLabel"><option value="" selected>全部</option><option value="0">未标记</option><option value="1">已标记</option><option value="2">使用淘宝应用接待</option></select></div>
-            <div class="field"><label>对话类型</label><select id="fType"><option value="">全部</option><option value="CONSULT_PRODUCT">商品咨询</option><option value="CONSULT_REPLY">咨询回复</option><option value="AFTER_SALE">售后</option><option value="COMPLAINT">投诉</option></select></div>
-            <div class="field"><label>业务线</label><select id="fBusi"><option value="" selected>全部</option><option value="RECEPTION">接待</option><option value="AFTER_SALE">售后</option></select></div>
-            <div class="field"><label>每页条数</label><input id="pageSize" value="50" type="number" min="1"></div>
-            <div class="field"><label>最大页数</label><input id="maxPages" value="40" type="number" min="1"></div>
-          </div>
-          <div class="field" style="margin-top:12px">
-            <label>高级：粘贴电商后台 Request Payload（可选，用于完全对齐官方筛选）</label>
-            <textarea id="rawPayload" placeholder='{"thirdShopId":"...","pageIndex":1,"pageSize":50,...}'></textarea>
-          </div>
-          <div class="section-title" style="margin-top:14px">发送状态</div>
-          <div class="checkbar">
-            <label><input type="checkbox" class="sendTypeCb" value="0" checked> 未发送</label>
-            <label><input type="checkbox" class="sendTypeCb" value="1" checked> 自动发送</label>
-            <label><input type="checkbox" class="sendTypeCb" value="2" checked> 侧边栏点击</label>
-            <label><input type="checkbox" class="sendTypeCb" value="3"> 编辑后发送</label>
-            <label><input type="checkbox" id="overwriteCb"> 覆盖已有数据</label>
-          </div>
-          <div class="toolbar">
-            <div class="action-row">
-              <button class="btn btn-primary" id="goBtn" onclick="go()">抓取并分析</button>
-              <button class="btn btn-danger" id="stopBtn" style="display:none" onclick="stop()">停止</button>
-              <button class="btn" onclick="reanalyzeCurrent()">重新分析已有数据</button>
-              <button class="btn" onclick="refresh()">刷新概览</button>
-            </div>
-            <span id="filterSummary" class="status"></span>
-          </div>
-          <div class="progress" id="progressWrap">
-            <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
-            <div class="progress-meta"><span id="progressLabel"></span><span id="progressPct"></span></div>
-          </div>
-          <div class="log" id="log"></div>
-        </div>
-      </section>
-
-      <section class="card result-card">
-        <div class="card-header">训练优化看板</div>
-        <div class="card-body" id="resultArea"><div id="resultBody"><div class="empty">暂无结果</div></div></div>
-      </section>
-    </section>
-  </section>
-</main>
-<script>
-let currentShop = "";
-let abortCtrl = null;
-let lastAnalysis = null;
-let qaPage = 1;
-let issuePage = 1;
-let issueStatusFilter = "全部";
-let issuePriorityFilter = "全部";
-const QA_PAGE_SIZE = 20;
-const ISSUE_PAGE_SIZE = 20;
-const $ = id => document.getElementById(id);
-const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-async function get(url){ const r = await fetch(url); return r.json(); }
-async function post(url,data){ const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); return r.json(); }
-function log(msg){ const e=$("log"); e.style.display="block"; e.textContent += msg + "\n"; e.scrollTop=e.scrollHeight; }
-function setProgress(pct,label){ $("progressBar").style.width=pct+"%"; $("progressPct").textContent=pct+"%"; $("progressLabel").textContent=label; }
-function dateValue(hour, minute){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`; }
-
-async function init(){
-  $("beginTime").value = dateValue(0,0);
-  $("endTime").value = dateValue(23,59);
-  const r = await get("/api/cookie-status");
-  $("shopStatus").textContent = r.hasCookie ? "Cookie 已保存" : "未配置";
-  if (r.hasCookie) $("cookie").placeholder = "已保存，不需要重复填写";
-  await loadShops();
-  updateFilterSummary();
-  // 检查是否为管理员，显示管理员入口
-  try {
-    const me = await get("/api/me");
-    if (me.user && me.user.role === "admin") {
-      const adminLink = $("adminLink");
-      if (adminLink) adminLink.style.display = "inline";
-    }
-  } catch(e) {}
-}
-
-function parseCookieTable(raw){
-  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const skip = new Set(["name","名称","value","值","domain","path","expires","size","httponly","secure","samesite","priority"]);
-  const pairs = [];
-  for (const line of lines) {
-    if (line.includes(";") && line.includes("=") && !line.includes("\t")) {
-      line.split(";").map(s => s.trim()).filter(Boolean).forEach(part => {
-        if (part.includes("=")) pairs.push(part);
-      });
-      continue;
-    }
-    let cols = line.split(/\t+/).map(s => s.trim()).filter(Boolean);
-    if (cols.length < 2) cols = line.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
-    if (cols.length < 2) continue;
-    const name = cols[0];
-    const value = cols[1];
-    if (!name || !value || skip.has(name.toLowerCase()) || name.includes("=")) continue;
-    pairs.push(`${name}=${value}`);
-  }
-  return Array.from(new Map(pairs.map(pair => [pair.split("=")[0], pair])).values());
-}
-
-async function buildCookie(){
-  const parts = parseCookieTable($("cookieRaw").value);
-  if(!parts.length){ $("cookieMsg").textContent = "未识别到 Cookie"; return; }
-  const cookie = parts.join("; ");
-  $("cookie").value = cookie;
-  $("cookieMsg").textContent = `已拼接 ${parts.length} 项`;
-  try { await navigator.clipboard.writeText(cookie); $("cookieMsg").textContent += "，已复制"; } catch(e) {}
-}
-
-function clearCookieRaw(){ $("cookieRaw").value = ""; $("cookieMsg").textContent = ""; }
-async function copyCookie(){
-  const cookie = $("cookie").value.trim();
-  if(!cookie){ $("cookieMsg").textContent = "Cookie 为空"; return; }
-  try { await navigator.clipboard.writeText(cookie); $("cookieMsg").textContent = "已复制"; }
-  catch(e){ $("cookieMsg").textContent = "复制失败"; }
-}
-
-async function saveCookie(){
-  const cookie = $("cookie").value.trim();
-  if(!cookie){ $("cookieMsg").textContent = "请先粘贴 Cookie"; return; }
-  const r = await post("/api/save-cookie",{cookie});
-  $("cookieMsg").textContent = r.success ? "已保存" : (r.error || "保存失败");
-  await init();
-}
-
-async function loadShops(){
-  const r = await get("/api/shops");
-  const sel = $("shopSelect");
-  sel.innerHTML = '<option value="">-- 选择店铺 --</option>';
-  (r.shops || []).forEach(s => {
-    sel.innerHTML += `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || s.id)}</option>`;
-  });
-}
-
-async function switchShop(){
-  const sid = $("shopSelect").value;
-  if(!sid) return;
-  currentShop = sid;
-  $("shopId").value = sid;
-  const selected = $("shopSelect").selectedOptions[0];
-  $("m4").textContent = selected ? selected.textContent : sid;
-  await post("/api/set-shop",{shopId:sid});
-  await refresh();
-  await loadExistingAnalysis();
-}
-
-async function probeCurrentShop(){
-  const sid = $("shopId").value.trim();
-  if(!sid) return alert("请输入店铺 ID");
-  $("batchStatus").textContent = "探测中...";
-  const r = await post("/api/probe-shop",{shopId:sid, cookie:$("cookie").value.trim()});
-  $("batchStatus").textContent = r.success ? `${r.shopName || sid}，共 ${r.total || 0} 条` : (r.error || "探测失败");
-  if(r.success){ currentShop = sid; $("m4").textContent = r.shopName || sid; await loadShops(); await refresh(); }
-}
-
-async function delShop(){
-  const sid = $("shopSelect").value || $("shopId").value.trim();
-  if(!sid) return alert("请选择或输入店铺 ID");
-  if(!confirm(`删除店铺 ${sid} 的本地数据？`)) return;
-  await post("/api/delete-shop",{shopId:sid});
-  if(currentShop === sid) currentShop = "";
-  $("shopId").value = "";
-  $("resultBody").innerHTML = '<div class="empty">数据已删除</div>';
-  await loadShops();
-  await refresh();
-}
-
-async function batchProbe(){
-  const ids = $("batchIds").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  if(!ids.length) return;
-  $("batchStatus").textContent = "探测中...";
-  const parts = [];
-  for (const id of ids) {
-    const r = await post("/api/probe-shop",{shopId:id, cookie:$("cookie").value.trim()});
-    parts.push(`${id}: ${r.shopName || r.name || r.error || "失败"}`);
-  }
-  $("batchStatus").textContent = parts.join(" | ");
-  await loadShops();
-}
-
-function resetBtn(){
-  $("goBtn").style.display="inline-flex";
-  $("stopBtn").style.display="none";
-  $("progressWrap").style.display="none";
-  abortCtrl = null;
-}
-
-async function loadExistingAnalysis(){
-  const sid = $("shopId").value.trim() || currentShop;
-  if(!sid) return;
-  const r = await get("/api/analysis?shopId="+encodeURIComponent(sid));
-  if(r.success && r.data && !r.data.error){
-    renderAnalysis(r.data);
-  }
-}
-
-async function reanalyzeCurrent(){
-  const sid = $("shopId").value.trim() || currentShop;
-  if(!sid) return alert("请先选择或输入店铺 ID");
-  $("resultBody").innerHTML='<div class="empty">正在重新分析已有数据...</div>';
-  const a = await post("/api/analyze",{shopId:sid});
-  if(!a.success || a.data?.error){
-    $("resultBody").innerHTML='<div class="empty">没有可分析的数据，请先抓取数据</div>';
-    return;
-  }
-  renderAnalysis(a.data);
-  await refresh();
-}
-
-function collectFilters(){
-  const filters = {};
-  if($("fReviewStatus").value !== "") filters.reviewStatus = Number($("fReviewStatus").value);
-  if($("fIfLabel").value !== "") filters.ifLabel = Number($("fIfLabel").value);
-  if($("fType").value !== "") filters.type = $("fType").value;
-  if($("fBusi").value !== "") filters.busi = $("fBusi").value;
-  const sendType = Array.from(document.querySelectorAll(".sendTypeCb:checked")).map(cb => Number(cb.value));
-  if(sendType.length) filters.sendType = sendType;
-  return filters;
-}
-
-function updateFilterSummary(){
-  const labels = [];
-  ["fReviewStatus","fIfLabel","fType","fBusi"].forEach(id => {
-    const el = $(id);
-    const text = el.selectedOptions[0]?.textContent || "";
-    if(el.value !== "") labels.push(text);
-  });
-  const checked = Array.from(document.querySelectorAll(".sendTypeCb:checked")).map(cb => cb.parentElement.textContent.trim());
-  $("filterSummary").textContent = labels.concat(checked).join(" / ");
-}
-document.addEventListener("change", e => {
-  if(e.target.matches("select,.sendTypeCb")) updateFilterSummary();
-});
-
-async function go(){
-  const sid = $("shopId").value.trim() || currentShop;
-  if(!sid) return alert("请选择或输入店铺 ID");
-  currentShop = sid;
-  $("shopId").value = sid;
-  $("goBtn").style.display="none";
-  $("stopBtn").style.display="inline-flex";
-  $("progressWrap").style.display="block";
-  $("log").style.display="block";
-  $("log").textContent="";
-  $("resultBody").innerHTML='<div class="empty">正在处理...</div>';
-  setProgress(10, "正在抓取数据...");
-  log(`=== 店铺: ${sid} ===`);
-
-  const cookie = $("cookie").value.trim();
-  if(cookie) await post("/api/save-cookie",{cookie});
-
-  abortCtrl = new AbortController();
-  const f = await post("/api/fetch", {
-    shopId:sid,
-    beginTime:$("beginTime").value,
-    endTime:$("endTime").value,
-    pageSize:Number($("pageSize").value || 50),
-    maxPages:Number($("maxPages").value || 40),
-    filters:collectFilters(),
-    overwrite:$("overwriteCb").checked,
-    rawPayload:$("rawPayload").value.trim(),
-  });
-
-  if(f.requestBody) log(`[REQ] ${JSON.stringify(f.requestBody)}`);
-  (f.log || []).forEach(l => {
-    if(l.status === "ok") {
-      log(`[OK] 第${l.page}页 ${l.count}条 (共${l.total}条)`);
-      if(l.ids && l.ids.length) log(`[IDS] 第${l.page}页样本ID：${l.ids.join(", ")}`);
-    }
-    else if(l.status === "error") log(`[ERR] ${l.msg}`);
-    else log(`[EMPTY] 第${l.page}页`);
-  });
-  if(!f.success){ resetBtn(); return; }
-  log(`>> 新增 ${f.totalFetched || 0} 条，累计 ${f.totalStored || 0} 条`);
-  if(f.shopName){ $("m4").textContent = f.shopName; await loadShops(); }
-  if(!f.totalStored){ $("resultBody").innerHTML='<div class="empty">没有匹配数据</div>'; resetBtn(); return; }
-
-  setProgress(55, "正在分析话题...");
-  const a = await post("/api/analyze",{shopId:sid});
-  if(!a.success || a.data?.error){ log(`[ERR] ${a.data?.error || a.error || "分析失败"}`); resetBtn(); return; }
-  setProgress(90, "正在生成结果...");
-  renderAnalysis(a.data);
-  await refresh();
-  setProgress(100, "完成");
-  resetBtn();
-}
-
-function renderAnalysis(d){
-  lastAnalysis = d;
-  qaPage = 1;
-  issuePage = 1;
-  $("m1").textContent = d.totalRecords || 0;
-  $("m2").textContent = (d.topicDistribution || []).length;
-  $("m3").textContent = d.storeDiagnosis?.pendingCount || 0;
-  $("m4").textContent = `${d.storeDiagnosis?.adoptionRiskAvg || 0}%`;
-
-  let html = renderDiagnosis(d) + renderIdentityDashboard(d) + renderTopicDashboard(d) + renderKnowledgeCards(d);
-  html += '<div id="issueWorkbenchArea"></div>';
-  html += '<div id="qaPageArea"></div>';
-  $("resultBody").innerHTML = html;
-  renderIssueWorkbench();
-  renderQaPage();
-}
-
-function renderDiagnosis(d){
-  const s = d.storeDiagnosis || {};
-  const topics = (s.topIssueTopics || []).map(item => `${escapeHtml(item.topic)} ${item.count}`).join(" / ") || "-";
-  const actions = (s.actionDistribution || []).map(item => `${escapeHtml(item.action)} ${item.count}`).join(" / ") || "-";
-  let html = '<div class="diagnosis-grid">';
-  html += `<div class="diagnosis-main"><div class="score">${s.healthScore ?? "-"}</div><div class="score-label">店铺智能体健康分</div><div style="margin-top:12px;color:#dbeafe;line-height:1.6">优先处理高风险、未回复和重复追问问题，可直接转成知识卡片。</div></div>`;
-  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.issueCount || 0}</div><div class="diagnosis-label">问题簇</div></div>`;
-  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.highPriorityCount || 0}</div><div class="diagnosis-label">高优先级</div></div>`;
-  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.pendingCount || 0}</div><div class="diagnosis-label">待处理</div></div>`;
-  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.reviewCount || 0}</div><div class="diagnosis-label">待复查</div></div>`;
-  html += '</div>';
-  html += '<div class="diagnosis-summary">';
-  html += `<div class="summary-box"><b>诊断结论</b><ul>${(s.summary || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`;
-  html += `<div class="summary-box"><b>今日任务清单</b><div class="task-list">${(s.todayTasks || []).map(task => `<div class="task-item"><span>${escapeHtml(task.title)}</span><span class="task-type">${escapeHtml(task.type)}</span></div>`).join("") || '<div class="knowledge-line">暂无待办任务</div>'}</div><div class="knowledge-line" style="margin-top:8px">高频问题：${topics}</div><div class="knowledge-line">建议动作：${actions}</div></div>`;
-  html += '</div>';
-  return html;
-}
-
-function renderTopicDashboard(d){
-  const insight = d.topicInsights || {};
-  const topics = insight.topics || [];
-  const maxCount = Math.max(...topics.map(t => t.count || 0), 1);
-  let html = '<div class="topic-dashboard">';
-  html += '<div class="issue-head"><div><div class="result-title" style="margin:0">话题分析看板</div><div class="qa-count">从话题量级、风险、知识缺口和关键词四个维度定位店铺智能体问题</div></div></div>';
-  html += '<div class="topic-kpis">';
-  html += `<div class="topic-kpi"><strong>${insight.topicCount || 0}</strong><span>识别话题数</span></div>`;
-  html += `<div class="topic-kpi"><strong>${insight.coverageRate || 0}%</strong><span>样本覆盖率</span></div>`;
-  html += `<div class="topic-kpi"><strong>${insight.issueTopicCount || 0}</strong><span>存在问题的话题</span></div>`;
-  html += `<div class="topic-kpi"><strong>${insight.knowledgeGapCount || 0}</strong><span>知识缺口</span></div>`;
-  html += `<div class="topic-kpi"><strong>${insight.avgAdoptionRisk || 0}%</strong><span>平均采纳风险</span></div>`;
-  html += '</div>';
-  html += '<div class="topic-layout">';
-  html += '<div class="topic-panel"><div class="topic-panel-title">话题量级与知识缺口排行</div>';
-  if(!topics.length){
-    html += '<div class="empty">暂无话题分析数据</div>';
-  } else {
-    topics.forEach(t => {
-      const width = Math.max(4, Math.round((t.count || 0) / maxCount * 100));
-      html += '<div class="rank-row">';
-      html += `<div class="rank-name" title="${escapeHtml(t.topic)}">${escapeHtml(t.topic)}</div>`;
-      html += `<div><div class="rank-track"><div class="rank-fill" style="width:${width}%"></div></div><div class="heat-sub">问题簇 ${t.issueCount || 0} · 缺口 ${t.knowledgeGapCount || 0} · 高优 ${t.highPriorityCount || 0}</div></div>`;
-      html += `<div class="rank-meta">${t.count || 0} 条<br>${t.percentage || 0}%</div>`;
-      html += '</div>';
-    });
-  }
-  html += '</div>';
-  html += '<div class="topic-panel"><div class="topic-panel-title">风险热区</div><div class="topic-heat">';
-  (insight.riskTopics || []).slice(0,6).forEach(t => {
-    html += `<div class="heat-card"><div class="heat-title">${escapeHtml(t.topic)}</div><div class="heat-sub">高优 ${t.highPriorityCount || 0} · 未解决 ${t.unresolvedCount || 0}</div><div class="heat-risk"><span class="badge ${riskClass(t.adoptionRisk)}">风险 ${t.adoptionRisk || 0}%</span></div></div>`;
-  });
-  if(!(insight.riskTopics || []).length) html += '<div class="empty">暂无风险热区</div>';
-  html += '</div><div class="topic-panel-title" style="margin-top:14px">高频关键词</div><div class="keyword-cloud">';
-  (insight.keywords || []).forEach(k => {
-    html += `<span class="keyword">${escapeHtml(k.word)} ${k.count}</span>`;
-  });
-  html += '</div></div></div>';
-  html += '<div class="topic-panel" style="margin-top:10px"><div class="topic-panel-title">知识补齐机会</div><div class="topic-heat">';
-  (insight.gapTopics || []).slice(0,6).forEach(t => {
-    html += `<div class="heat-card"><div class="heat-title">${escapeHtml(t.topic)}</div><div class="heat-sub">待补 ${t.knowledgeGapCount || 0} 个卡片 · 动作：${escapeHtml(t.suggestedAction || "-")}</div><div class="knowledge-line">优先覆盖该话题下未回复、弱回复和重复追问样本。</div></div>`;
-  });
-  if(!(insight.gapTopics || []).length) html += '<div class="empty">暂无知识缺口</div>';
-  html += '</div></div></div>';
-  return html;
-}
-
-function traceIdentityHtml(identity){
-  identity = identity || {};
-  const chips = [];
-  if(identity.buyerId) chips.push(`买家ID：${identity.buyerId}`);
-  if(identity.productId) chips.push(`商品ID：${identity.productId}`);
-  if(identity.spuId) chips.push(`SPU：${identity.spuId}`);
-  if(identity.skuId) chips.push(`SKU：${identity.skuId}`);
-  if(identity.traceId) chips.push(`Trace：${identity.traceId}`);
-  if(identity.productTitle) chips.push(`商品：${identity.productTitle}`);
-  if(!chips.length) return '<div class="trace-meta"><span class="trace-chip">未抓到买家/商品线索</span></div>';
-  return `<div class="trace-meta">${chips.map(text => `<span class="trace-chip" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`).join("")}</div>`;
-}
-
-function renderIdentityList(rows, kind){
-  if(!rows || !rows.length) return '<div class="empty">暂无可用线索</div>';
-  return `<div class="identity-list">${rows.map(row => {
-    const name = kind === "product" ? (row.productTitle || row.productId || "-") : (row.buyerId || "-");
-    const meta = kind === "product"
-      ? `商品ID：${row.productId || "-"}${row.skuId ? " / SKU：" + row.skuId : ""}`
-      : `涉及商品 ${row.productCount || 0} 个`;
-    return `<div class="identity-row"><div><div class="identity-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div><div class="identity-meta">${escapeHtml(meta)}</div></div><div class="identity-count">${row.issueCount || row.traceCount || 0}<div class="qa-count">${row.issueCount ? "问题" : "样本"}</div></div></div>`;
-  }).join("")}</div>`;
-}
-
-function renderIdentityDashboard(d){
-  const s = d.identityInsights || {};
-  let html = '<div class="identity-dashboard">';
-  html += '<div class="issue-head"><div><div class="result-title" style="margin:0">商品 / 买家线索</div><div class="qa-count">从抓取结果中提取商品ID、买家ID、SPU/SKU、Trace ID，方便定位问题商品和回查会话</div></div></div>';
-  html += '<div class="identity-grid">';
-  html += `<div class="identity-kpi"><strong>${s.productCount || 0}</strong><span>涉及商品数</span></div>`;
-  html += `<div class="identity-kpi"><strong>${s.buyerCount || 0}</strong><span>涉及买家数</span></div>`;
-  html += `<div class="identity-kpi"><strong>${s.productCoverage || 0}%</strong><span>商品线索覆盖率</span></div>`;
-  html += `<div class="identity-kpi"><strong>${s.buyerCoverage || 0}%</strong><span>买家线索覆盖率</span></div>`;
-  html += '</div>';
-  html += '<div class="identity-layout">';
-  html += `<div class="identity-panel"><div class="topic-panel-title">问题最多的商品</div>${renderIdentityList((s.issueProducts || s.topProducts || []).slice(0,6), "product")}</div>`;
-  html += `<div class="identity-panel"><div class="topic-panel-title">问题最多的买家</div>${renderIdentityList((s.issueBuyers || s.topBuyers || []).slice(0,6), "buyer")}</div>`;
-  html += '</div>';
-  html += `<div class="knowledge-line">未抓到商品线索 ${s.missingProduct || 0} 条，未抓到买家线索 ${s.missingBuyer || 0} 条；如果这里为空，说明接口当前批次没有返回对应字段。</div>`;
-  html += '</div>';
-  return html;
-}
-
-function topKnowledgeIssues(d){
-  return (d.issueWorkbench || [])
-    .filter(issue => issue.status !== "忽略")
-    .slice()
-    .sort((a,b) => (b.score || 0) - (a.score || 0))
-    .slice(0, 6);
-}
-
-function renderKnowledgeCards(d){
-  const cards = topKnowledgeIssues(d);
-  let html = '<div class="issue-head"><div><div class="result-title" style="margin:0">待补知识卡片</div><div class="qa-count">按优先级自动生成卡片草稿，可导出后完善到知识库</div></div><button class="btn btn-sm" onclick="exportKnowledgeCardsCsv()">导出知识卡片 CSV</button></div>';
-  if(!cards.length) return html + '<div class="empty" style="margin-bottom:14px">暂无待补知识卡片</div>';
-  html += '<div class="knowledge-grid">';
-  cards.forEach(issue => {
-    const draft = issue.knowledgeCardDraft || {};
-    html += '<div class="knowledge-card">';
-    html += `<div class="knowledge-title">${escapeHtml(draft.title || issue.standardQuestion || "-")}</div>`;
-    html += `<div><span class="badge ${priorityClass(issue.priority)}">${issue.priority}</span> <span class="badge issue-type">${escapeHtml(issue.issueType || "-")}</span> <span class="badge ${riskClass(issue.adoptionRisk)}">风险 ${issue.adoptionRisk || 0}%</span></div>`;
-    html += `<div class="knowledge-line"><b>标准问：</b>${escapeHtml(draft.standardQuestion || "-")}</div>`;
-    html += `<div class="knowledge-line"><b>标准答案：</b>${escapeHtml(draft.standardAnswer || draft.answerOutline || "-")}</div>`;
-    html += `<div class="knowledge-line"><b>转人工边界：</b>${escapeHtml(draft.manualHandoffRule || "-")}</div>`;
-    html += `<div class="knowledge-line">${(draft.triggerWords || []).map(word => `<span class="kw">${escapeHtml(word)}</span>`).join("")}</div>`;
-    html += '</div>';
-  });
-  html += '</div>';
-  return html;
-}
-
-function filteredIssues(){
-  let rows = (lastAnalysis?.issueWorkbench || []).slice();
-  if(issueStatusFilter !== "全部") rows = rows.filter(item => item.status === issueStatusFilter);
-  if(issuePriorityFilter !== "全部") rows = rows.filter(item => item.priority === issuePriorityFilter);
-  return rows;
-}
-
-function priorityClass(priority){
-  if(priority === "高") return "badge-high";
-  if(priority === "中") return "badge-mid";
-  return "badge-low";
-}
-
-function riskClass(risk){
-  if((risk || 0) >= 70) return "risk-high";
-  if((risk || 0) >= 45) return "risk-mid";
-  return "risk-low";
-}
-
-function pagerSlots(current, totalPages){
-  if(totalPages <= 7) return Array.from({length: totalPages}, (_, i) => i + 1);
-  if(current <= 4) return [1,2,3,4,5,"...",totalPages];
-  if(current >= totalPages - 3) return [1,"...",totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
-  return [1,"...",current-1,current,current+1,"...",totalPages];
-}
-
-function renderPager(kind, current, totalPages, total, pageSize){
-  const setter = kind === "issue" ? "setIssuePage" : "setQaPage";
-  const jumper = kind === "issue" ? "jumpIssuePage" : "jumpQaPage";
-  let html = '<div class="pager">';
-  html += `<div class="pager-total">共 ${total} 条 · ${pageSize} 条/页 · 第 ${current}/${totalPages} 页</div>`;
-  html += `<button class="page-btn" onclick="${setter}(${current - 1})" ${current <= 1 ? "disabled" : ""}>‹</button>`;
-  html += '<div class="pager-pages">';
-  pagerSlots(current, totalPages).forEach(slot => {
-    if(slot === "...") html += '<span class="page-ellipsis">…</span>';
-    else html += `<button class="page-btn ${slot === current ? "active" : ""}" onclick="${setter}(${slot})">${slot}</button>`;
-  });
-  html += '</div>';
-  html += `<button class="page-btn" onclick="${setter}(${current + 1})" ${current >= totalPages ? "disabled" : ""}>›</button>`;
-  html += `<div class="pager-jump"><span>跳至</span><input id="${kind}JumpInput" type="number" min="1" max="${totalPages}" value="${current}" onkeydown="if(event.key==='Enter') ${jumper}()"><span>页</span><button class="btn btn-sm" onclick="${jumper}()">确定</button></div>`;
-  html += `<select class="pager-size" disabled><option>${pageSize} 条/页</option></select>`;
-  html += '</div>';
-  return html;
-}
-
-function keepPagerPosition(areaId, renderFn){
-  const area = $(areaId);
-  const pager = area ? area.querySelector(".pager") : null;
-  const beforeTop = pager ? pager.getBoundingClientRect().top : null;
-  renderFn();
-  if(beforeTop === null) return;
-  requestAnimationFrame(() => {
-    const nextArea = $(areaId);
-    const nextPager = nextArea ? nextArea.querySelector(".pager") : null;
-    if(!nextPager) return;
-    const afterTop = nextPager.getBoundingClientRect().top;
-    window.scrollBy({top: afterTop - beforeTop, left: 0, behavior: "auto"});
-  });
-}
-
-function renderIssueWorkbench(){
-  if(!lastAnalysis || !$("issueWorkbenchArea")) return;
-  const rows = filteredIssues();
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / ISSUE_PAGE_SIZE));
-  issuePage = Math.min(Math.max(issuePage, 1), totalPages);
-  const start = (issuePage - 1) * ISSUE_PAGE_SIZE;
-  const pageRows = rows.slice(start, start + ISSUE_PAGE_SIZE);
-  let html = '<div class="issue-panel">';
-  html += '<div class="issue-head">';
-  html += `<div><div class="result-title" style="margin:0">问题优化工作台</div><div class="qa-count">自动筛出未回复、弱回复和高风险问题，共 ${total} 个问题簇</div></div>`;
-  html += '<div class="issue-tools">';
-  html += `<select onchange="setIssueStatusFilter(this.value)"><option ${issueStatusFilter==="全部"?"selected":""}>全部</option><option ${issueStatusFilter==="待处理"?"selected":""}>待处理</option><option ${issueStatusFilter==="需要补知识"?"selected":""}>需要补知识</option><option ${issueStatusFilter==="需要改话术"?"selected":""}>需要改话术</option><option ${issueStatusFilter==="加转人工规则"?"selected":""}>加转人工规则</option><option ${issueStatusFilter==="已补知识"?"selected":""}>已补知识</option><option ${issueStatusFilter==="已优化话术"?"selected":""}>已优化话术</option><option ${issueStatusFilter==="复查通过"?"selected":""}>复查通过</option><option ${issueStatusFilter==="忽略"?"selected":""}>忽略</option></select>`;
-  html += `<select onchange="setIssuePriorityFilter(this.value)"><option ${issuePriorityFilter==="全部"?"selected":""}>全部</option><option ${issuePriorityFilter==="高"?"selected":""}>高</option><option ${issuePriorityFilter==="中"?"selected":""}>中</option><option ${issuePriorityFilter==="低"?"selected":""}>低</option></select>`;
-  html += '<button class="btn btn-sm" onclick="exportIssuesCsv()">导出 CSV</button>';
-  html += '</div></div>';
-  if(!total){
-    html += '<div class="empty">没有识别到待优化问题</div></div>';
-    $("issueWorkbenchArea").innerHTML = html;
-    return;
-  }
-  html += '<table><tr><th style="width:64px">优先级</th><th>问题簇</th><th style="width:120px">失败原因</th><th style="width:96px">出现</th><th>知识卡片建议</th><th style="width:90px">价值分</th><th style="width:210px">处理动作</th></tr>';
-  pageRows.forEach(issue => {
-    const first = (issue.examples || [])[0] || {};
-    const draft = issue.knowledgeCardDraft || {};
-    html += '<tr>';
-    html += `<td><span class="badge ${priorityClass(issue.priority)}">${issue.priority}</span></td>`;
-    html += `<td><div class="issue-question">${escapeHtml(issue.standardQuestion || "-")}</div><div class="issue-meta">${escapeHtml(issue.topic || "-")} · 示例：${escapeHtml(first.question || "-")}</div>${traceIdentityHtml(first.identity)}<div class="issue-reason">${escapeHtml((issue.reasons || []).join("；") || "-")}</div></td>`;
-    html += `<td><span class="badge issue-type">${escapeHtml(issue.issueType || "-")}</span><div class="issue-meta">${escapeHtml(issue.failureReason || "-")}</div></td>`;
-    html += `<td>${issue.count || 0} 次<br><span class="qa-count">未解决 ${issue.unresolvedCount || 0}</span></td>`;
-    html += `<td><div><b>${escapeHtml(issue.suggestedAction || "-")}</b></div><div class="issue-suggestion">${escapeHtml(draft.standardAnswer || draft.answerOutline || issue.trainingSuggestion || "-")}</div><div class="issue-meta">触发词：${(draft.triggerWords || []).map(escapeHtml).join("、") || "-"}</div><div class="issue-meta">转人工：${escapeHtml(draft.manualHandoffRule || "-")}</div></td>`;
-    html += `<td><span class="value-score">${issue.optimizationValue || 0}</span><div class="issue-meta">风险 ${issue.adoptionRisk || 0}%</div></td>`;
-    html += `<td><div><span class="badge issue-status">${escapeHtml(issue.status || "待处理")}</span></div><div class="mini-actions" style="margin-top:8px">`;
-    ["需要补知识","需要改话术","加转人工规则","已补知识","已优化话术","复查通过","忽略"].forEach(status => {
-      html += `<button class="btn" onclick='updateIssueStatus(${JSON.stringify(issue.id)},${JSON.stringify(status)})'>${status}</button>`;
-    });
-    html += '</div></td></tr>';
-  });
-  html += '</table>';
-  html += renderPager("issue", issuePage, totalPages, total, ISSUE_PAGE_SIZE) + '</div>';
-  $("issueWorkbenchArea").innerHTML = html;
-}
-
-function setIssuePage(page){
-  issuePage = page;
-  keepPagerPosition("issueWorkbenchArea", renderIssueWorkbench);
-}
-
-function jumpIssuePage(){
-  const value = Number($("issueJumpInput")?.value || issuePage);
-  setIssuePage(value);
-}
-
-function setIssueStatusFilter(value){
-  issueStatusFilter = value;
-  issuePage = 1;
-  renderIssueWorkbench();
-}
-
-function setIssuePriorityFilter(value){
-  issuePriorityFilter = value;
-  issuePage = 1;
-  renderIssueWorkbench();
-}
-
-async function updateIssueStatus(issueId, status){
-  const sid = $("shopId").value.trim() || currentShop;
-  if(!sid) return alert("请先选择店铺");
-  const r = await post("/api/issue-status", {shopId:sid, issueId, status});
-  if(!r.success) return alert(r.error || "状态保存失败");
-  (lastAnalysis.issueWorkbench || []).forEach(issue => {
-    if(issue.id === issueId) issue.status = status;
-  });
-  renderIssueWorkbench();
-}
-
-function csvCell(value){
-  return `"${String(value ?? "").replace(/"/g, '""')}"`;
-}
-
-function exportIssuesCsv(){
-  const rows = filteredIssues();
-  const headers = ["优先级","优化价值分","问题类型","失败原因","采纳风险","状态","问题簇","话题","出现次数","未解决数","原因","建议处理","触发词","标准问题","相似问法","标准答案","转人工边界","适用场景","不适用场景","示例问题","当前回复"];
-  const lines = [headers.map(csvCell).join(",")];
-  rows.forEach(issue => {
-    const first = (issue.examples || [])[0] || {};
-    const draft = issue.knowledgeCardDraft || {};
-    lines.push([
-      issue.priority, issue.optimizationValue, issue.issueType, issue.failureReason, issue.adoptionRisk, issue.status, issue.standardQuestion, issue.topic,
-      issue.count, issue.unresolvedCount, (issue.reasons || []).join("；"),
-      issue.suggestedAction, (draft.triggerWords || []).join("；"),
-      draft.standardQuestion || issue.standardQuestion, (draft.similarQuestions || []).join("；"),
-      draft.standardAnswer || draft.answerOutline || "", draft.manualHandoffRule || "",
-      draft.applicableScene || "", draft.notApplicableScene || "", first.question || "", first.answer || "",
-    ].map(csvCell).join(","));
-  });
-  const blob = new Blob(["\ufeff" + lines.join("\n")], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `issue-workbench-${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportKnowledgeCardsCsv(){
-  const rows = topKnowledgeIssues(lastAnalysis || {});
-  const headers = ["卡片标题","优先级","优化价值分","问题类型","失败原因","采纳风险","标准问题","相似问法","触发词","标准答案","转人工边界","适用场景","不适用场景","采纳目标","出现次数","状态"];
-  const lines = [headers.map(csvCell).join(",")];
-  rows.forEach(issue => {
-    const draft = issue.knowledgeCardDraft || {};
-    lines.push([
-      draft.title || "", issue.priority, issue.optimizationValue, issue.issueType, issue.failureReason, issue.adoptionRisk,
-      draft.standardQuestion || issue.standardQuestion || "",
-      (draft.similarQuestions || []).join("；"),
-      (draft.triggerWords || []).join("；"),
-      draft.standardAnswer || draft.answerOutline || "",
-      draft.manualHandoffRule || "",
-      draft.applicableScene || "",
-      draft.notApplicableScene || "",
-      draft.acceptanceGoal || "",
-      issue.count || 0,
-      issue.status || "待处理",
-    ].map(csvCell).join(","));
-  });
-  const blob = new Blob(["\ufeff" + lines.join("\n")], {type:"text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `knowledge-cards-${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function flattenQaExamples(d){
-  const rows = [];
-  (d.qaExamples || []).forEach(topic => {
-    (topic.examples || []).forEach(qa => rows.push({...qa, topic: topic.topic}));
-  });
-  return rows;
-}
-
-function renderQaPage(){
-  if(!lastAnalysis || !$("qaPageArea")) return;
-  const rows = flattenQaExamples(lastAnalysis);
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / QA_PAGE_SIZE));
-  qaPage = Math.min(Math.max(qaPage, 1), totalPages);
-  const start = (qaPage - 1) * QA_PAGE_SIZE;
-  const pageRows = rows.slice(start, start + QA_PAGE_SIZE);
-  let html = '<div class="qa-panel">';
-  html += `<div class="qa-head"><div class="result-title" style="margin:0">典型 Q&A 示例</div><div class="qa-count">共 ${total} 条，每页 ${QA_PAGE_SIZE} 条，第 ${qaPage}/${totalPages} 页</div></div>`;
-  if(!total){
-    html += '<div class="empty">暂无 Q&A 示例</div></div>';
-    $("qaPageArea").innerHTML = html;
-    return;
-  }
-  html += '<table><tr><th style="width:56px">#</th><th style="width:150px">话题</th><th>用户问题</th><th>智能体回复</th></tr>';
-  pageRows.forEach((qa, idx) => {
-    html += `<tr><td>${start + idx + 1}</td><td><span class="qa-topic">${escapeHtml(qa.topic || "-")}</span></td><td><div class="qa-q">${escapeHtml(qa.question || "-")}</div>${traceIdentityHtml(qa.identity)}</td><td class="qa-a">${escapeHtml(qa.answer || "-")}</td></tr>`;
-  });
-  html += '</table>';
-  html += renderPager("qa", qaPage, totalPages, total, QA_PAGE_SIZE) + '</div>';
-  $("qaPageArea").innerHTML = html;
-}
-
-function setQaPage(page){
-  qaPage = page;
-  keepPagerPosition("qaPageArea", renderQaPage);
-}
-
-function jumpQaPage(){
-  const value = Number($("qaJumpInput")?.value || qaPage);
-  setQaPage(value);
-}
-
-async function refresh(){
-  const sid = $("shopId").value.trim() || currentShop;
-  const r = await get("/api/overview" + (sid ? `?shopId=${encodeURIComponent(sid)}` : ""));
-  $("m1").textContent = r.totalTraces || 0;
-  $("m2").textContent = r.totalTopics || 0;
-  $("m3").textContent = r.totalIssues || 0;
-}
-
-function stop(){ if(abortCtrl) abortCtrl.abort(); resetBtn(); }
-init();
-</script>
-</body>
-</html>"""
-
-
-LOGIN_HTML = """<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>登录 - 店铺智能体训练工作台</title>
-<style>
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f3f6fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;color:#172033}
-.box{width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #dfe5ee;border-radius:12px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,.08)}
-h1{font-size:20px;margin:0 0 8px}.tip{color:#64748b;font-size:13px;margin-bottom:18px}label{font-size:12px;font-weight:700;color:#475467}
-input{width:100%;height:38px;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font:inherit}
-button{width:100%;height:38px;margin-top:16px;border:0;border-radius:8px;background:#1677ff;color:#fff;font-weight:700;cursor:pointer}
-.err{margin-top:12px;color:#d92d20;font-size:13px}
-</style>
-</head>
-<body><form class="box" method="post"><h1>店铺智能体训练工作台</h1><div class="tip">请输入访问密码</div><label>访问密码</label><input name="password" type="password" autofocus><button type="submit">进入后台</button>{error}</form></body></html>"""
-
-AUTH_STYLE = """
-body{margin:0;min-height:100vh;background:#eef3f9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;color:#172033}
-.shell{min-height:100vh;display:grid;place-items:center;padding:24px}.box{width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #dfe5ee;border-radius:12px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,.08)}
-h1{font-size:20px;margin:0 0 8px}.tip{color:#64748b;font-size:13px;margin-bottom:18px;line-height:1.6}label{font-size:12px;font-weight:700;color:#475467}
-input,select{box-sizing:border-box;width:100%;height:38px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font:inherit}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.check{display:flex;align-items:center;gap:6px;color:#475467;font-size:13px}.check input{width:14px;height:14px;margin:0}
-button,.btn{width:100%;height:38px;margin-top:8px;border:0;border-radius:8px;background:#1677ff;color:#fff;font-weight:700;cursor:pointer;text-decoration:none;display:grid;place-items:center}.link{color:#175cd3;text-decoration:none;font-size:13px}.err{margin-top:12px;color:#d92d20;font-size:13px}.ok{margin-top:12px;color:#027a48;font-size:13px}
-table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4e7ec;text-align:left;font-size:13px}th{background:#f8fafc;color:#475467}.admin{max-width:1100px;margin:0 auto;padding:24px}.panel{background:#fff;border:1px solid #dfe5ee;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.06);overflow:hidden}.panel-head{height:52px;padding:0 16px;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;justify-content:space-between}.panel-body{padding:16px}.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{width:auto;height:30px;margin:0;padding:0 10px}.danger{background:#d92d20}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}.admin{padding:12px;overflow:auto}}
-"""
-
-ACCOUNT_LOGIN_HTML = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>&#30331;&#24405; - &#24215;&#38138;&#26234;&#33021;&#20307;&#35757;&#32451;&#24037;&#20316;&#21488;</title><style>{style}</style></head><body><div class="shell"><form class="box" method="post"><h1>&#24215;&#38138;&#26234;&#33021;&#20307;&#35757;&#32451;&#24037;&#20316;&#21488;</h1><div class="tip">&#35831;&#36755;&#20837;&#36134;&#21495;&#23494;&#30721;&#30331;&#24405;&#12290;&#21246;&#36873;&#35760;&#20303;&#30331;&#24405;&#21518;&#65292;&#19979;&#27425;&#25171;&#24320;&#22806;&#37096;&#38142;&#25509;&#20250;&#33258;&#21160;&#36827;&#20837;&#21518;&#21488;&#12290;</div><label>&#36134;&#21495;</label><input name="username" value="{username}" autocomplete="username" autofocus><label>&#23494;&#30721;</label><input name="password" type="password" autocomplete="current-password"><div class="row"><label class="check"><input name="remember" type="checkbox" checked> &#35760;&#20303;&#30331;&#24405;</label><a class="link" href="/register">&#27880;&#20876;&#36134;&#21495;</a></div><button type="submit">&#36827;&#20837;&#21518;&#21488;</button><div class="row" style="margin-top:12px"><a class="link" href="/admin/users">&#31649;&#29702;&#21592;&#20837;&#21475;</a></div>{error}</form></div></body></html>"""
-
-REGISTER_HTML = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>&#27880;&#20876; - &#24215;&#38138;&#26234;&#33021;&#20307;&#35757;&#32451;&#24037;&#20316;&#21488;</title><style>{style}</style></head><body><div class="shell"><form class="box" method="post"><h1>&#27880;&#20876;&#36134;&#21495;</h1><div class="tip">&#27880;&#20876;&#21518;&#40664;&#35748;&#21487;&#30452;&#25509;&#20351;&#29992;&#12290;&#31649;&#29702;&#21592;&#21487;&#22312;&#36134;&#21495;&#21518;&#21488;&#20462;&#25913;&#23494;&#30721;&#12289;&#31105;&#29992;&#36134;&#21495;&#12289;&#35774;&#32622;&#21040;&#26399;&#26102;&#38388;&#12290;</div><label>&#36134;&#21495;</label><input name="username" value="{username}" autocomplete="username" autofocus><label>&#23494;&#30721;</label><input name="password" type="password" autocomplete="new-password"><label>&#30830;&#35748;&#23494;&#30721;</label><input name="password2" type="password" autocomplete="new-password"><button type="submit">&#27880;&#20876;&#24182;&#30331;&#24405;</button><div class="row" style="margin-top:12px"><a class="link" href="/login">&#24050;&#26377;&#36134;&#21495;&#65292;&#21435;&#30331;&#24405;</a></div>{error}</form></div></body></html>"""
-
-ADMIN_HTML = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>&#36134;&#21495;&#21518;&#21488;&#31649;&#29702;</title><style>{style}</style></head><body><div class="admin"><div class="panel"><div class="panel-head"><h1>&#36134;&#21495;&#21518;&#21488;&#31649;&#29702;</h1><div><a class="link" href="/">&#36820;&#22238;&#24037;&#20316;&#21488;</a> | <a class="link" href="/logout">&#36864;&#20986;</a></div></div><div class="panel-body"><div class="grid"><input id="newUsername" placeholder="&#26032;&#36134;&#21495;"><input id="newPassword" placeholder="&#21021;&#22987;&#23494;&#30721;"><select id="newRole"><option value="user">&#26222;&#36890;&#36134;&#21495;</option><option value="admin">&#31649;&#29702;&#21592;</option></select><button onclick="createUser()">&#26032;&#22686;&#36134;&#21495;</button></div><table><thead><tr><th>&#36134;&#21495;</th><th>&#35282;&#33394;</th><th>&#29366;&#24577;</th><th>&#21040;&#26399;&#26102;&#38388;</th><th>&#26368;&#36817;&#30331;&#24405;</th><th>&#25805;&#20316;</th></tr></thead><tbody id="userRows"></tbody></table><div id="msg" class="muted" style="margin-top:12px"></div></div></div></div><script>
-const $=id=>document.getElementById(id);const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-async function api(url,data){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data||{})});return r.json()}
-async function load(){const r=await fetch("/api/admin/users");const d=await r.json();$("userRows").innerHTML=(d.users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td>${u.role==="admin"?"\u7ba1\u7406\u5458":"\u666e\u901a\u7528\u6237"}</td><td>${u.active?"\u542f\u7528":"\u7981\u7528"}</td><td>${esc(u.expiresAt||"\u6c38\u4e45")}</td><td>${esc(u.lastLoginAt||"-")}</td><td><div class="actions"><button onclick="resetPwd(this)" data-username="${esc(u.username)}">\u6539\u5bc6\u7801</button><button onclick="setExpire(this)" data-username="${esc(u.username)}">\u5230\u671f\u65f6\u95f4</button><button onclick="toggleUser(this)" data-username="${esc(u.username)}" data-active="${u.active}">${u.active?"\u7981\u7528":"\u542f\u7528"}</button><button class="danger" onclick="delUser(this)" data-username="${esc(u.username)}">\u5220\u9664</button></div></td></tr>`).join("")}
-async function createUser(){const r=await api("/api/admin/users/create",{username:$("newUsername").value,password:$("newPassword").value,role:$("newRole").value});$("msg").textContent=r.success?"\u5df2\u65b0\u589e":r.error;load()}
-async function resetPwd(btn){const username=btn.dataset.username,password=prompt("\u8f93\u5165\u65b0\u5bc6\u7801");if(!password)return;const r=await api("/api/admin/users/update",{username,password});$("msg").textContent=r.success?"\u5bc6\u7801\u5df2\u4fee\u6539":r.error;load()}
-async function setExpire(btn){const username=btn.dataset.username,expiresAt=prompt("\u5230\u671f\u65f6\u95f4\uff0c\u683c\u5f0f 2026-12-31T23:59:59\uff1b\u7559\u7a7a\u8868\u793a\u6c38\u4e45");if(expiresAt===null)return;const r=await api("/api/admin/users/update",{username,expiresAt});$("msg").textContent=r.success?"\u5230\u671f\u65f6\u95f4\u5df2\u66f4\u65b0":r.error;load()}
-async function toggleUser(btn){const username=btn.dataset.username,active=btn.dataset.active!=="true";const r=await api("/api/admin/users/update",{username,active});$("msg").textContent=r.success?"\u72b6\u6001\u5df2\u66f4\u65b0":r.error;load()}
-async function delUser(btn){const username=btn.dataset.username;if(!confirm("\u786e\u5b9a\u5220\u9664\u8d26\u53f7 "+username+"?"))return;const r=await api("/api/admin/users/delete",{username});$("msg").textContent=r.success?"\u5df2\u5220\u9664":r.error;load()}
-load();
-</script></body></html>"""
-
-
-def render_auth_page(template, **kwargs):
-    values = {"style": AUTH_STYLE, "error": "", "username": ""}
-    values.update(kwargs)
-    html = template
-    for key, value in values.items():
-        html = html.replace("{" + key + "}", str(value))
-    return html
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1112,7 +244,7 @@ def login():
             save_users(users)
             login_user(username, remember=bool(request.form.get("remember")))
             return redirect(url_for("index"))
-    return render_auth_page(ACCOUNT_LOGIN_HTML, username=username, error=error)
+    return render_template("login.html", username=username, error=error)
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -1148,7 +280,7 @@ def register():
             save_users(users)
             login_user(username, remember=True)
             return redirect(url_for("index"))
-    return render_auth_page(REGISTER_HTML, username=username, error=error)
+    return render_template("register.html", username=username, error=error)
 
 
 @app.route("/logout")
@@ -1160,7 +292,7 @@ def logout():
 @app.route("/admin/users")
 @require_admin
 def admin_users_page():
-    return render_auth_page(ADMIN_HTML)
+    return render_template("admin.html")
 
 
 @app.route("/api/me")
@@ -1266,7 +398,7 @@ def api_admin_delete_user():
 @app.route("/")
 @require_auth
 def index():
-    return HTML, 200, {"Content-Type": "text/html; charset=utf-8"}
+    return render_template("index.html"), 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.route("/api/cookie-status")
@@ -1981,11 +1113,25 @@ def extract_trace_identity(record):
     product_title = pick_product("spuTitle", "title", "goodsTitle", "productTitle")
     product_id = goods_code or spu_id or sku_id
 
+    # Extract buyer info with fallback chain
+    raw_buyer = pick("buyerAccount", "buyerId", "buyerNick", "buyerName", "userId")
+
+    # Try to get a shorter alias from buyerAlias/buyerNick/buyerShowName
+    buyer_alias = pick("buyerAlias", "buyerNick", "buyerShowName", "buyerNickname")
+    if buyer_alias:
+        buyer_display = buyer_alias
+    elif raw_buyer and len(raw_buyer) > 32:
+        # Truncate long opaque buyer IDs
+        buyer_display = raw_buyer[:16] + "..." + raw_buyer[-12:]
+    else:
+        buyer_display = raw_buyer
+
     return {
         "traceId": pick("id", "traceId"),
         "shopId": pick("thirdShopId"),
         "shopName": pick("shopName"),
-        "buyerId": pick("buyerAccount", "buyerId", "buyerNick", "buyerName", "userId"),
+        "buyerId": buyer_display,
+        "buyerIdRaw": raw_buyer,
         "sellerId": pick("sellerAccount", "sellerId"),
         "productId": product_id,
         "goodsCode": goods_code,
@@ -1998,7 +1144,7 @@ def extract_trace_identity(record):
         "type": pick("type"),
         "time": pick("time"),
         "topicName": pick("topicName"),
-        "hasBuyer": bool(pick("buyerAccount", "buyerId", "buyerNick", "buyerName", "userId")),
+        "hasBuyer": bool(raw_buyer),
         "hasProduct": bool(product_id or product_title),
     }
 
@@ -2204,6 +1350,166 @@ def get_analysis():
     if not analysis:
         return jsonify({"success": False, "error": "暂无分析结果"})
     return jsonify({"success": True, "data": analysis})
+
+
+@app.route("/api/export-chat", methods=["GET", "POST"])
+@require_auth
+def export_chat():
+    """Export chat records as CSV from fetched traces."""
+    if request.method == "GET":
+        shop_id = request.args.get("shopId", "").strip()
+        begin_time = request.args.get("beginTime", "")
+        end_time = request.args.get("endTime", "")
+    else:
+        data = request.get_json() or {}
+        shop_id = str(data.get("shopId", "")).strip()
+        begin_time = data.get("beginTime", "")
+        end_time = data.get("endTime", "")
+
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"})
+    traces = load_json(data_file(shop_id), [])
+    if not traces:
+        return jsonify({"success": False, "error": "没有可导出的数据"})
+
+    # Optional time filters
+    if begin_time:
+        begin_ts = datetime.fromisoformat(begin_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+        traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) >= begin_ts]
+    if end_time:
+        end_ts = datetime.fromisoformat(end_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+        traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) <= end_ts]
+
+    rows = []
+    for record in traces:
+        if not isinstance(record, dict):
+            continue
+        question, answer = parse_conversation(record)
+        buyer = record.get("buyerAccount", "")
+        seller = record.get("sellerAccount", "")
+        topic = record.get("topicName", "")
+        trace_id = record.get("id", "")
+        product_info = record.get("productInfo", {}) if isinstance(record.get("productInfo"), dict) else {}
+        product_title = product_info.get("spuTitle", "") or product_info.get("title", "") or ""
+        sku_id = product_info.get("skuId", "") or ""
+        spu_id = product_info.get("spuId", "") or ""
+        ts = record.get("time", 0)
+        try:
+            dt_str = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            dt_str = str(ts)
+
+        rows.append({
+            "traceId": trace_id,
+            "时间": dt_str,
+            "买家": buyer[:50],
+            "卖家": seller[:50],
+            "话题": topic[:50],
+            "商品": product_title[:100],
+            "SPU": spu_id,
+            "SKU": sku_id,
+            "用户问题": question[:500],
+            "智能体回复": answer[:1000],
+            "状态": record.get("status", ""),
+            "类型": record.get("type", ""),
+        })
+
+    if not rows:
+        return jsonify({"success": False, "error": "没有匹配的聊天记录"})
+
+    # Build CSV
+    output = io.StringIO()
+    fieldnames = list(rows[0].keys())
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    csv_content = output.getvalue()
+    output.close()
+
+    from flask import Response
+    return Response(
+        csv_content.encode("utf-8-sig"),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment;filename=chat-{shop_id}-{int(time.time())}.csv"}
+    )
+
+
+@app.route("/api/chat-records", methods=["GET", "POST"])
+@require_auth
+def chat_records():
+    """Return chat records as JSON for inline viewing."""
+    if request.method == "GET":
+        shop_id = request.args.get("shopId", "").strip()
+        begin_time = request.args.get("beginTime", "")
+        end_time = request.args.get("endTime", "")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("pageSize", 50))
+    else:
+        data = request.get_json() or {}
+        shop_id = str(data.get("shopId", "")).strip()
+        begin_time = data.get("beginTime", "")
+        end_time = data.get("endTime", "")
+        page = int(data.get("page", 1))
+        page_size = int(data.get("pageSize", 50))
+
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"})
+    traces = load_json(data_file(shop_id), [])
+    if not traces:
+        return jsonify({"success": False, "error": "没有可展示的聊天记录"})
+
+    # Apply time filters
+    if begin_time:
+        begin_ts = datetime.fromisoformat(begin_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+        traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) >= begin_ts]
+    if end_time:
+        end_ts = datetime.fromisoformat(end_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+        traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) <= end_ts]
+
+    total = len(traces)
+    traces = sorted(traces, key=lambda t: t.get("time", 0), reverse=True)
+    start = (page - 1) * page_size
+    page_traces = traces[start:start + page_size]
+
+    records = []
+    for record in page_traces:
+        question, answer = parse_conversation(record)
+        buyer = record.get("buyerAccount", "")
+        seller = record.get("sellerAccount", "")
+        topic = record.get("topicName", "")
+        product_info = record.get("productInfo", {}) if isinstance(record.get("productInfo"), dict) else {}
+        product_title = product_info.get("spuTitle", "") or product_info.get("title", "") or ""
+        sku_id = product_info.get("skuId", "") or ""
+        spu_id = product_info.get("spuId", "") or ""
+        ts = record.get("time", 0)
+        try:
+            dt_str = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            dt_str = str(ts)
+
+        records.append({
+            "id": record.get("id", ""),
+            "time": dt_str,
+            "buyer": buyer[:60],
+            "seller": seller[:60],
+            "topic": topic[:50],
+            "product": product_title[:80],
+            "spu": spu_id,
+            "sku": sku_id,
+            "question": question[:500],
+            "answer": answer[:1000],
+            "status": record.get("status", ""),
+            "type": record.get("type", ""),
+        })
+
+    return jsonify({
+        "success": True,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": max(1, (total + page_size - 1) // page_size),
+        "records": records,
+    })
 
 
 @app.route("/api/issue-status", methods=["POST"])

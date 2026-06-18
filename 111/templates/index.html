@@ -1,294 +1,999 @@
-﻿<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QA 智能体优化后台</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA Agent Trace Analyzer</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f0f2f5; color:#333; }
-.header { background:linear-gradient(135deg,#1a73e8,#0d47a1); color:#fff; padding:20px 32px; }
-.header h1 { font-size:22px; }
-.header p { opacity:.8; font-size:13px; margin-top:4px; }
-.container { max-width:1200px; margin:0 auto; padding:20px; }
-.grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-.card { background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.08); overflow:hidden; }
-.card-header { padding:14px 20px; border-bottom:1px solid #eee; font-weight:600; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
-.card-body { padding:16px 20px; }
-.form-group { margin-bottom:14px; }
-.form-group label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; color:#555; }
-.form-group input,.form-group textarea,.form-group select { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:13px; }
-.form-group textarea { resize:vertical; min-height:60px; font-family:monospace; }
-.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 18px; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:500; transition:.2s; }
-.btn-primary { background:#1a73e8; color:#fff; }
-.btn-primary:hover { background:#1557b0; }
-.btn-success { background:#0d904f; color:#fff; }
-.btn-success:hover { background:#0a6e3a; }
-.btn-danger { background:#d93025; color:#fff; }
-.btn-danger:hover { background:#b3261e; }
-.btn-outline { background:#fff; color:#1a73e8; border:1px solid #1a73e8; }
-.btn-sm { padding:4px 10px; font-size:12px; }
-.status-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
-.status-ok { background:#e6f4ea; color:#0d904f; }
-.status-err { background:#fce8e6; color:#d93025; }
-.status-empty { background:#fef7e0; color:#b06000; }
-.metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
-.metric { background:#fff; border-radius:8px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-.metric-value { font-size:28px; font-weight:700; color:#1a73e8; }
-.metric-label { font-size:12px; color:#888; margin-top:4px; }
-.full-width { grid-column:1/-1; }
-table { width:100%; border-collapse:collapse; }
-th,td { padding:10px 14px; text-align:left; border-bottom:1px solid #eee; font-size:13px; }
-th { background:#fafafa; font-weight:600; color:#555; }
-.tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; margin:2px; }
-.tag-high { background:#fce8e6; color:#d93025; }
-.tag-mid { background:#fef7e0; color:#b06000; }
-.tag-low { background:#e8f5e9; color:#2e7d32; }
-.loading { text-align:center; padding:40px; color:#888; }
-.loading::after { content:"..."; animation:dots 1.5s infinite; }
-@keyframes dots { 0%,20%{content:"."} 40%{content:".."} 60%,100%{content:"..."} }
-.log-area { max-height:200px; overflow-y:auto; background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:6px; font-family:monospace; font-size:12px; }
-.log-area .log-ok { color:#6a9955; }
-.log-area .log-err { color:#f44747; }
-.log-area .log-empty { color:#ce9178; }
-.checklist { margin:6px 0 0 16px; }
-.checklist li { font-size:12px; color:#666; margin:2px 0; }
-.progress-bar { height:6px; background:#e8e8e8; border-radius:3px; overflow:hidden; margin-top:6px; }
-.progress-fill { height:100%; border-radius:3px; transition:.3s; }
+:root{
+  --bg:#f3f6fb;--panel:#fff;--line:#dfe5ee;--line-strong:#cbd5e1;
+  --text:#172033;--muted:#64748b;--primary:#1677ff;--primary-dark:#0958d9;
+  --danger:#d92d20;--success:#039855;--warn:#dc6803;--indigo:#4f46e5;
+  --shadow:0 1px 2px rgba(16,24,40,.04);--shadow-lg:0 12px 30px rgba(15,23,42,.08)
+}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;font-size:13px}
+.topbar{height:60px;background:#101828;color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #1f2937;box-shadow:0 8px 24px rgba(16,24,40,.16)}
+.brand{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:760}.brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1677ff,#4f46e5);display:grid;place-items:center;font-weight:800;box-shadow:0 8px 18px rgba(22,119,255,.32)}
+.top-meta{color:#cbd5e1;font-size:12px}.page{max-width:1320px;margin:0 auto;padding:18px 20px 28px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}.metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#1677ff}.metric:nth-child(3)::before{background:#039855}.metric:nth-child(4)::before{background:#4f46e5}
+.metric-value{font-size:27px;line-height:1;font-weight:780;color:#0f172a}.metric-label{font-size:12px;color:var(--muted);margin-top:8px}.metric:nth-child(2) .metric-value{color:#1677ff}.metric:nth-child(3) .metric-value{color:#039855}
+.layout{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}.stack{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}.card-header{height:46px;padding:0 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#fff,#fbfcfe);font-weight:750}
+.card-body{padding:14px 16px}.section-title{font-size:12px;color:#475467;font-weight:700;margin:2px 0 10px}.divider{height:1px;background:var(--line);margin:14px 0}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.filter-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px 12px}.action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:12px;color:#475467;font-weight:650}
+input,select,textarea{width:100%;border:1px solid var(--line-strong);border-radius:6px;background:white;color:var(--text);font:inherit;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s}
+input,select{height:32px;padding:0 9px}textarea{min-height:76px;resize:vertical;padding:8px 9px;font-family:Consolas,"SFMono-Regular",monospace;line-height:1.5}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(22,119,255,.12)}
+.btn{height:32px;border:1px solid var(--line-strong);border-radius:6px;padding:0 12px;background:#fff;color:#1f2937;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--primary);color:var(--primary)}.btn-primary{background:var(--primary);border-color:var(--primary);color:white}.btn-primary:hover{background:var(--primary-dark);border-color:var(--primary-dark);color:white}
+.btn-danger{background:#fff;border-color:#fda29b;color:var(--danger)}.btn-danger:hover{background:#fff5f5;border-color:var(--danger);color:var(--danger)}.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.status{font-size:12px;color:var(--muted)}.pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:650}
+.checkbar{display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#f8fafc}.checkbar label{display:inline-flex;align-items:center;gap:6px;color:#344054}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}.progress{display:none;margin-top:14px}.progress-track{height:7px;background:#e4e7ec;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:var(--primary);transition:width .2s}.progress-meta{display:flex;justify-content:space-between;margin-top:5px;font-size:12px;color:var(--muted)}
+.log{display:none;white-space:pre-wrap;margin-top:12px;max-height:220px;overflow:auto;background:#0f172a;color:#d1d5db;padding:12px;border-radius:6px;font:12px/1.6 Consolas,monospace}
+.result-card{margin-top:14px}.result-title{font-size:14px;font-weight:750;margin:0 0 8px}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:8px;background:#fbfcfe}
+.diagnosis-grid{display:grid;grid-template-columns:1.1fr repeat(4,1fr);gap:10px;margin-bottom:14px}.diagnosis-main{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:10px;padding:16px;box-shadow:var(--shadow-lg)}.score{font-size:34px;font-weight:820;line-height:1}.score-label{color:#cbd5e1;margin-top:6px}.diagnosis-card{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fff}.diagnosis-value{font-size:22px;font-weight:780}.diagnosis-label{color:var(--muted);font-size:12px;margin-top:4px}.diagnosis-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.summary-box{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px}.summary-box b{display:block;margin-bottom:6px}.summary-box ul{margin:0;padding-left:18px;color:#475467;line-height:1.7}
+.task-list{display:grid;gap:8px}.task-item{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 10px}.task-type{display:inline-flex;height:22px;align-items:center;padding:0 7px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:750}.value-score{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f5f3ff;color:#5b21b6;font-size:12px;font-weight:750}
+.topic-dashboard{margin:14px 0 18px}.topic-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px}.topic-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-kpi strong{font-size:22px;display:block}.topic-kpi span{font-size:12px;color:var(--muted)}.topic-layout{display:grid;grid-template-columns:1.2fr .8fr;gap:10px}.topic-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-panel-title{font-weight:780;margin-bottom:10px}.rank-row{display:grid;grid-template-columns:110px 1fr 72px;gap:10px;align-items:center;margin:10px 0}.rank-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rank-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.rank-fill{height:100%;background:linear-gradient(90deg,#1677ff,#4f46e5);border-radius:999px}.rank-meta{text-align:right;color:#475467;font-size:12px}.topic-heat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.heat-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fbfcfe}.heat-title{font-weight:750}.heat-sub{color:var(--muted);font-size:12px;margin-top:4px}.heat-risk{margin-top:8px;font-weight:800}.keyword-cloud{display:flex;gap:6px;flex-wrap:wrap}.keyword{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;background:#f2f4f7;color:#344054;font-weight:650;font-size:12px}
+.identity-dashboard{margin:0 0 18px}.identity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}.identity-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-kpi strong{font-size:22px;display:block}.identity-kpi span{font-size:12px;color:var(--muted)}.identity-layout{display:grid;grid-template-columns:1fr 1fr;gap:10px}.identity-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-list{display:grid;gap:8px}.identity-row{display:grid;grid-template-columns:1fr 70px;gap:10px;align-items:start;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;padding:9px}.identity-name{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.identity-meta{font-size:12px;color:var(--muted);margin-top:3px;word-break:break-all}.identity-count{text-align:right;font-weight:800;color:#175cd3}.trace-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.trace-chip{display:inline-flex;max-width:180px;height:22px;align-items:center;padding:0 7px;border-radius:6px;background:#f2f4f7;color:#344054;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.knowledge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 18px}.knowledge-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px;box-shadow:var(--shadow)}.knowledge-title{font-weight:780;color:#101828;margin-bottom:8px}.knowledge-line{font-size:12px;color:#475467;line-height:1.55;margin-top:6px}.kw{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:999px;background:#eef4ff;color:#175cd3;margin:3px 4px 0 0;font-size:12px;font-weight:650}
+table{width:100%;border-collapse:collapse;margin-top:8px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;vertical-align:top}th{color:#475467;background:#f8fafc;font-weight:700}
+th{white-space:nowrap}
+.topic-bar{height:6px;background:#e4e7ec;border-radius:999px;overflow:hidden;margin-top:5px}.topic-fill{height:100%;background:var(--primary)}.qa-q{font-weight:650;color:#0958d9}.qa-a{color:#334155;white-space:pre-wrap}.qa-a,.issue-suggestion{max-height:92px;overflow:auto;padding-right:4px}
+/* Better scrollbar styling */
+.issue-suggestion::-webkit-scrollbar{width:5px}
+.issue-suggestion::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px}
+.issue-suggestion::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.issue-suggestion::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+.qa-a::-webkit-scrollbar{width:5px}
+.qa-a::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px}
+.qa-a::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.qa-a::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+/* Table cell overflow protection */
+td{overflow-wrap:break-word;word-break:break-all}
+.issue-panel{margin-bottom:18px}.issue-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}.issue-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.issue-tools select{width:120px}.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}.badge-high{background:#fef3f2;color:#b42318}.badge-mid{background:#fffaeb;color:#b54708}.badge-low{background:#ecfdf3;color:#027a48}.issue-type{background:#eef4ff;color:#175cd3}.issue-status{background:#f2f4f7;color:#344054}.risk-high{background:#fef3f2;color:#b42318}.risk-mid{background:#fff7ed;color:#c2410c}.risk-low{background:#ecfdf3;color:#027a48}.issue-question{font-weight:750;color:#101828}.issue-meta{margin-top:4px;color:var(--muted);font-size:12px}.issue-reason{color:#7a271a;font-size:12px;margin-top:5px}.issue-suggestion{color:#344054;font-size:12px;line-height:1.5;margin-top:5px}.mini-actions{display:flex;gap:6px;flex-wrap:wrap}.mini-actions .btn{height:26px;padding:0 8px;font-size:12px}
+.qa-panel{margin-top:18px}.qa-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.qa-count{font-size:12px;color:var(--muted);font-weight:500}.qa-topic{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f2f4f7;color:#344054;font-size:12px;font-weight:650}.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}.pager-total{color:#475467;font-size:12px;margin-right:auto}.pager-pages{display:grid;grid-template-columns:repeat(7,32px);gap:4px}.page-btn{height:30px;min-width:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:#344054;font-weight:650;cursor:pointer}.page-btn:hover{border-color:var(--primary);color:var(--primary)}.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}.page-btn:disabled{cursor:not-allowed;opacity:.45;border-color:var(--line);color:var(--muted)}.page-ellipsis{height:30px;display:grid;place-items:center;color:var(--muted);font-weight:700}.pager-jump{display:flex;align-items:center;gap:6px;color:#475467;font-size:12px}.pager-jump input{width:48px;height:30px;text-align:center}.pager-size{height:30px;width:auto;min-width:92px}
+.cookie-output{min-height:92px}.muted-line{color:var(--muted);font-size:12px;margin-top:6px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
+@media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}}
 </style>
 </head>
 <body>
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">QA</div><span>店铺智能体训练工作台</span></div>
+  <div class="top-meta">问题诊断 · 知识卡片 · 采纳率优化</div>
+</header>
+<main class="page">
+  <section class="metrics">
+    <div class="metric"><div class="metric-value" id="m1">0</div><div class="metric-label">已抓取 Trace</div></div>
+    <div class="metric"><div class="metric-value" id="m2">0</div><div class="metric-label">识别话题</div></div>
+    <div class="metric"><div class="metric-value" id="m3">0</div><div class="metric-label">待补知识卡片</div></div>
+    <div class="metric"><div class="metric-value" id="m4">-</div><div class="metric-label">采纳风险/当前店铺</div></div>
+  </section>
 
-<div class="header">
-  <h1>🔍 QA 智能体优化后台</h1>
-  <p>抓取 Agent Trace 数据 → 话题分析 → 生成 QA 规则</p>
-</div>
-
-<div class="container">
-
-  <!-- 指标概览 -->
-  <div class="metrics" id="metrics">
-    <div class="metric"><div class="metric-value" id="mTraces">0</div><div class="metric-label">已抓取 Trace</div></div>
-    <div class="metric"><div class="metric-value" id="mTopics">0</div><div class="metric-label">识别话题类别</div></div>
-    <div class="metric"><div class="metric-value" id="mRules">0</div><div class="metric-label">生成 QA 规则</div></div>
-    <div class="metric"><div class="metric-value" id="mScore">-</div><div class="metric-label">平均 QA 评分</div></div>
-  </div>
-
-  <div class="grid">
-    <!-- 左侧: 配置 + 抓取 -->
-    <div>
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">⚙️ API 配置</div>
+  <section class="layout">
+    <aside class="stack">
+      <section class="card">
+        <div class="card-header"><span>Cookie 拼接助手</span><span id="shopStatus" class="pill">未检测</span></div>
         <div class="card-body">
-          <div class="form-group">
-            <label>API 地址</label>
-            <input id="cfgApiUrl" value="https://agent.tanyuai.com/api/im/agent-trace/paginateV2">
+          <div class="field">
+            <label>Cookie 表格</label>
+            <textarea id="cookieRaw" placeholder="Name&#9;Value&#9;Domain"></textarea>
           </div>
-          <div class="form-group">
-            <label>Authorization Token</label>
-            <input id="cfgToken" placeholder="Bearer token（选填）">
+          <div class="toolbar">
+            <div class="action-row">
+              <button class="btn btn-primary btn-sm" onclick="buildCookie()">拼接并复制</button>
+              <button class="btn btn-sm" onclick="clearCookieRaw()">清空</button>
+            </div>
+            <span id="cookieMsg" class="status"></span>
           </div>
-          <div class="form-group">
-            <label>Cookie（从浏览器 DevTools 复制）</label>
-            <textarea id="cfgCookie" placeholder="粘贴完整 Cookie 字符串"></textarea>
+          <div class="divider"></div>
+          <div class="field">
+            <label>Cookie 字符串</label>
+            <textarea id="cookie" class="cookie-output" placeholder="name=value; name2=value2"></textarea>
           </div>
-          <div class="form-group">
-            <label>额外请求参数（JSON）</label>
-            <textarea id="cfgExtraParams" placeholder='{"storeId":"xxx","tenantId":"xxx"}'>{"pageNo":1,"pageSize":20}</textarea>
+          <div class="toolbar">
+            <div class="action-row">
+              <button class="btn btn-primary btn-sm" onclick="saveCookie()">保存 Cookie</button>
+              <button class="btn btn-sm" onclick="copyCookie()">复制</button>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
-          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="loadConfig()">🔄 加载已保存配置</button>
         </div>
-      </div>
+      </section>
 
-      <div class="card">
-        <div class="card-header">📥 数据抓取</div>
+      <section class="card">
+        <div class="card-header">店铺管理</div>
         <div class="card-body">
-          <div class="form-group">
-            <label>每页条数</label>
-            <input id="fetchPageSize" type="number" value="50" min="1" max="200">
+          <div class="field">
+            <label>已保存店铺</label>
+            <select id="shopSelect" onchange="switchShop()"><option value="">-- 选择店铺 --</option></select>
           </div>
-          <div class="form-group">
-            <label>最大页数</label>
-            <input id="fetchMaxPages" type="number" value="10" min="1" max="100">
+          <div class="grid-2" style="margin-top:10px">
+            <div class="field"><label>店铺 ID</label><input id="shopId" placeholder="thirdShopId"></div>
+            <div class="field"><label>探测页大小</label><input id="probePageSize" value="1" type="number" min="1"></div>
           </div>
-          <button class="btn btn-success" onclick="fetchData()">🚀 开始抓取</button>
-          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="analyzeData()">📊 话题分析</button>
-          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="generateQA()">📋 生成 QA 规则</button>
-          <div id="fetchLog" class="log-area" style="margin-top:12px;display:none"></div>
+          <div class="action-row" style="margin-top:10px">
+            <button class="btn btn-primary btn-sm" onclick="probeCurrentShop()">探测店铺</button>
+            <button class="btn btn-danger btn-sm" onclick="delShop()">删除</button>
+          </div>
+          <div class="divider"></div>
+          <div class="field">
+            <label>批量店铺 ID</label>
+            <textarea id="batchIds" placeholder="2605317072510000690"></textarea>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-sm" onclick="batchProbe()">批量探测</button>
+            <span id="batchStatus" class="status"></span>
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </aside>
 
-    <!-- 右侧: 结果展示 -->
-    <div>
-      <div class="card" style="margin-bottom:20px" id="topicCard">
-        <div class="card-header">📊 话题分布</div>
-        <div class="card-body" id="topicBody">
-          <p style="color:#888;font-size:13px">请先抓取数据并执行话题分析</p>
+    <section class="stack">
+      <section class="card">
+        <div class="card-header">
+          <span>后台筛选</span>
+          <span class="status">请求参数与 Agent Trace 列表对齐</span>
         </div>
-      </div>
-
-      <div class="card" id="qaCard">
-        <div class="card-header">📋 生成的 QA 规则</div>
-        <div class="card-body" id="qaBody">
-          <p style="color:#888;font-size:13px">请先执行「生成 QA 规则」</p>
+        <div class="card-body">
+          <div class="filter-grid">
+            <div class="field"><label>开始时间</label><input type="datetime-local" id="beginTime"></div>
+            <div class="field"><label>结束时间</label><input type="datetime-local" id="endTime"></div>
+            <div class="field"><label>处理状态</label><select id="fReviewStatus"><option value="" selected>全部</option><option value="0">待审核</option><option value="1">已审核</option><option value="2">已处理</option></select></div>
+            <div class="field"><label>标记状态</label><select id="fIfLabel"><option value="" selected>全部</option><option value="0">未标记</option><option value="1">已标记</option><option value="2">使用淘宝应用接待</option></select></div>
+            <div class="field"><label>对话类型</label><select id="fType"><option value="">全部</option><option value="CONSULT_PRODUCT">商品咨询</option><option value="CONSULT_REPLY">咨询回复</option><option value="AFTER_SALE">售后</option><option value="COMPLAINT">投诉</option></select></div>
+            <div class="field"><label>业务线</label><select id="fBusi"><option value="" selected>全部</option><option value="RECEPTION">接待</option><option value="AFTER_SALE">售后</option></select></div>
+            <div class="field"><label>每页条数</label><input id="pageSize" value="50" type="number" min="1"></div>
+            <div class="field"><label>最大页数</label><input id="maxPages" value="40" type="number" min="1"></div>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>高级：粘贴电商后台 Request Payload（可选，用于完全对齐官方筛选）</label>
+            <textarea id="rawPayload" placeholder='{"thirdShopId":"...","pageIndex":1,"pageSize":50,...}'></textarea>
+          </div>
+          <div class="section-title" style="margin-top:14px">发送状态</div>
+          <div class="checkbar">
+            <label><input type="checkbox" class="sendTypeCb" value="0" checked> 未发送</label>
+            <label><input type="checkbox" class="sendTypeCb" value="1" checked> 自动发送</label>
+            <label><input type="checkbox" class="sendTypeCb" value="2" checked> 侧边栏点击</label>
+            <label><input type="checkbox" class="sendTypeCb" value="3"> 编辑后发送</label>
+            <label><input type="checkbox" id="overwriteCb"> 覆盖已有数据</label>
+          </div>
+          <div class="toolbar">
+            <div class="action-row">
+              <button class="btn btn-primary" id="goBtn" onclick="go()">抓取并分析</button>
+              <button class="btn btn-danger" id="stopBtn" style="display:none" onclick="stop()">停止</button>
+              <button class="btn" onclick="reanalyzeCurrent()">重新分析已有数据</button>
+              <button class="btn" onclick="refresh()">刷新概览</button>
+              <button class="btn" onclick="exportChat()">导出聊天记录</button>
+              <button class="btn btn-primary" onclick="toggleChatViewer()">聊天记录</button>
+            </div>
+            <span id="filterSummary" class="status"></span>
+          </div>
+          <div class="progress" id="progressWrap">
+            <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+            <div class="progress-meta"><span id="progressLabel"></span><span id="progressPct"></span></div>
+          </div>
+          <div class="log" id="log"></div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
+      </section>
 
+      <section class="card result-card">
+        <div class="card-header">训练优化看板</div>
+        <div class="card-body" id="resultArea"><div id="resultBody"><div class="empty">暂无结果</div></div></div>
+      </section>
+
+      <section class="card" id="chatViewerPanel" style="display:none">
+        <div class="card-header"><span>聊天记录</span><button class="btn btn-sm" onclick="toggleChatViewer()">收起</button></div>
+        <div class="card-body" style="padding:0;overflow:hidden">
+          <div style="padding:10px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span id="chatTotal" class="qa-count">加载中...</span>
+            <div class="pager-jump" style="margin-left:auto"><span>跳至</span><input id="chatJumpInput" type="number" min="1" onkeydown="if(event.key==='Enter')jumpChatPage()"><span>页</span><button class="btn btn-sm" onclick="jumpChatPage()">确定</button></div>
+          </div>
+          <div style="overflow:auto;max-height:60vh" id="chatList"><div class="empty" style="padding:40px">点击"聊天记录"加载数据</div></div>
+        </div>
+      </section>
+    </section>
+  </section>
+</main>
 <script>
-const API = "";
+let currentShop = "";
+let abortCtrl = null;
+let lastAnalysis = null;
+let qaPage = 1;
+let issuePage = 1;
+let issueStatusFilter = "全部";
+let issuePriorityFilter = "全部";
+const QA_PAGE_SIZE = 20;
+const ISSUE_PAGE_SIZE = 20;
+const $ = id => document.getElementById(id);
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+async function get(url){ const r = await fetch(url); return r.json(); }
+async function post(url,data){ const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); return r.json(); }
+function log(msg){ const e=$("log"); e.style.display="block"; e.textContent += msg + "\n"; e.scrollTop=e.scrollHeight; }
+function setProgress(pct,label){ $("progressBar").style.width=pct+"%"; $("progressPct").textContent=pct+"%"; $("progressLabel").textContent=label; }
+function dateValue(hour, minute){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`; }
 
-async function apiGet(url) {
-  const r = await fetch(url);
-  return r.json();
+async function init(){
+  $("beginTime").value = dateValue(0,0);
+  $("endTime").value = dateValue(23,59);
+  const r = await get("/api/cookie-status");
+  $("shopStatus").textContent = r.hasCookie ? "Cookie 已保存" : "未配置";
+  if (r.hasCookie) $("cookie").placeholder = "已保存，不需要重复填写";
+  await loadShops();
+  updateFilterSummary();
 }
 
-async function apiPost(url, data) {
-  const r = await fetch(url, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(data)
+function parseCookieTable(raw){
+  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const skip = new Set(["name","名称","value","值","domain","path","expires","size","httponly","secure","samesite","priority"]);
+  const pairs = [];
+  for (const line of lines) {
+    if (line.includes(";") && line.includes("=") && !line.includes("\t")) {
+      line.split(";").map(s => s.trim()).filter(Boolean).forEach(part => {
+        if (part.includes("=")) pairs.push(part);
+      });
+      continue;
+    }
+    let cols = line.split(/\t+/).map(s => s.trim()).filter(Boolean);
+    if (cols.length < 2) cols = line.split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+    if (cols.length < 2) continue;
+    const name = cols[0];
+    const value = cols[1];
+    if (!name || !value || skip.has(name.toLowerCase()) || name.includes("=")) continue;
+    pairs.push(`${name}=${value}`);
+  }
+  return Array.from(new Map(pairs.map(pair => [pair.split("=")[0], pair])).values());
+}
+
+async function buildCookie(){
+  const parts = parseCookieTable($("cookieRaw").value);
+  if(!parts.length){ $("cookieMsg").textContent = "未识别到 Cookie"; return; }
+  const cookie = parts.join("; ");
+  $("cookie").value = cookie;
+  $("cookieMsg").textContent = `已拼接 ${parts.length} 项`;
+  try { await navigator.clipboard.writeText(cookie); $("cookieMsg").textContent += "，已复制"; } catch(e) {}
+}
+
+function clearCookieRaw(){ $("cookieRaw").value = ""; $("cookieMsg").textContent = ""; }
+async function copyCookie(){
+  const cookie = $("cookie").value.trim();
+  if(!cookie){ $("cookieMsg").textContent = "Cookie 为空"; return; }
+  try { await navigator.clipboard.writeText(cookie); $("cookieMsg").textContent = "已复制"; }
+  catch(e){ $("cookieMsg").textContent = "复制失败"; }
+}
+
+async function saveCookie(){
+  const cookie = $("cookie").value.trim();
+  if(!cookie){ $("cookieMsg").textContent = "请先粘贴 Cookie"; return; }
+  const r = await post("/api/save-cookie",{cookie});
+  $("cookieMsg").textContent = r.success ? "已保存" : (r.error || "保存失败");
+  await init();
+}
+
+async function loadShops(){
+  const r = await get("/api/shops");
+  const sel = $("shopSelect");
+  sel.innerHTML = '<option value="">-- 选择店铺 --</option>';
+  (r.shops || []).forEach(s => {
+    sel.innerHTML += `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || s.id)}</option>`;
   });
-  return r.json();
 }
 
-// ── 配置 ──
-async function saveConfig() {
-  const cfg = {
-    apiUrl: document.getElementById("cfgApiUrl").value,
-    token: document.getElementById("cfgToken").value,
-    cookie: document.getElementById("cfgCookie").value,
-  };
-  try {
-    const extra = JSON.parse(document.getElementById("cfgExtraParams").value || "{}");
-    cfg.extraParams = extra;
-  } catch(e) {
-    alert("额外参数 JSON 格式错误: " + e.message);
+async function switchShop(){
+  const sid = $("shopSelect").value;
+  if(!sid) return;
+  currentShop = sid;
+  $("shopId").value = sid;
+  const selected = $("shopSelect").selectedOptions[0];
+  $("m4").textContent = selected ? selected.textContent : sid;
+  await post("/api/set-shop",{shopId:sid});
+  await refresh();
+  await loadExistingAnalysis();
+}
+
+async function probeCurrentShop(){
+  const sid = $("shopId").value.trim();
+  if(!sid) return alert("请输入店铺 ID");
+  $("batchStatus").textContent = "探测中...";
+  const r = await post("/api/probe-shop",{shopId:sid, cookie:$("cookie").value.trim()});
+  $("batchStatus").textContent = r.success ? `${r.shopName || sid}，共 ${r.total || 0} 条` : (r.error || "探测失败");
+  if(r.success){ currentShop = sid; $("m4").textContent = r.shopName || sid; await loadShops(); await refresh(); }
+}
+
+async function delShop(){
+  const sid = $("shopSelect").value || $("shopId").value.trim();
+  if(!sid) return alert("请选择或输入店铺 ID");
+  if(!confirm(`删除店铺 ${sid} 的本地数据？`)) return;
+  await post("/api/delete-shop",{shopId:sid});
+  if(currentShop === sid) currentShop = "";
+  $("shopId").value = "";
+  $("resultBody").innerHTML = '<div class="empty">数据已删除</div>';
+  await loadShops();
+  await refresh();
+}
+
+async function batchProbe(){
+  const ids = $("batchIds").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if(!ids.length) return;
+  $("batchStatus").textContent = "探测中...";
+  const parts = [];
+  for (const id of ids) {
+    const r = await post("/api/probe-shop",{shopId:id, cookie:$("cookie").value.trim()});
+    parts.push(`${id}: ${r.shopName || r.name || r.error || "失败"}`);
+  }
+  $("batchStatus").textContent = parts.join(" | ");
+  await loadShops();
+}
+
+function resetBtn(){
+  $("goBtn").style.display="inline-flex";
+  $("stopBtn").style.display="none";
+  $("progressWrap").style.display="none";
+  abortCtrl = null;
+}
+
+async function loadExistingAnalysis(){
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid) return;
+  const r = await get("/api/analysis?shopId="+encodeURIComponent(sid));
+  if(r.success && r.data && !r.data.error){
+    renderAnalysis(r.data);
+  }
+}
+
+async function reanalyzeCurrent(){
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid) return alert("请先选择或输入店铺 ID");
+  $("resultBody").innerHTML='<div class="empty">正在重新分析已有数据...</div>';
+  const a = await post("/api/analyze",{shopId:sid});
+  if(!a.success || a.data?.error){
+    $("resultBody").innerHTML='<div class="empty">没有可分析的数据，请先抓取数据</div>';
     return;
   }
-  const r = await apiPost("/api/config", cfg);
-  alert(r.msg || "配置已保存");
+  renderAnalysis(a.data);
+  await refresh();
 }
 
-async function loadConfig() {
-  const r = await apiGet("/api/config");
-  if (r.apiUrl) document.getElementById("cfgApiUrl").value = r.apiUrl;
-  if (r.token) document.getElementById("cfgToken").value = r.token || "";
-  if (r.has_auth) document.getElementById("cfgCookie").placeholder = "已保存（不显示内容）";
-  alert("配置已加载");
+function collectFilters(){
+  const filters = {};
+  if($("fReviewStatus").value !== "") filters.reviewStatus = Number($("fReviewStatus").value);
+  if($("fIfLabel").value !== "") filters.ifLabel = Number($("fIfLabel").value);
+  if($("fType").value !== "") filters.type = $("fType").value;
+  if($("fBusi").value !== "") filters.busi = $("fBusi").value;
+  const sendType = Array.from(document.querySelectorAll(".sendTypeCb:checked")).map(cb => Number(cb.value));
+  if(sendType.length) filters.sendType = sendType;
+  return filters;
 }
 
-// ── 抓取 ──
-async function fetchData() {
-  const logEl = document.getElementById("fetchLog");
-  logEl.style.display = "block";
-  logEl.innerHTML = '<span style="color:#dcdcaa">⏳ 正在抓取数据...</span>';
+function updateFilterSummary(){
+  const labels = [];
+  ["fReviewStatus","fIfLabel","fType","fBusi"].forEach(id => {
+    const el = $(id);
+    const text = el.selectedOptions[0]?.textContent || "";
+    if(el.value !== "") labels.push(text);
+  });
+  const checked = Array.from(document.querySelectorAll(".sendTypeCb:checked")).map(cb => cb.parentElement.textContent.trim());
+  $("filterSummary").textContent = labels.concat(checked).join(" / ");
+}
+document.addEventListener("change", e => {
+  if(e.target.matches("select,.sendTypeCb")) updateFilterSummary();
+});
 
-  const r = await apiPost("/api/fetch", {
-    pageSize: parseInt(document.getElementById("fetchPageSize").value),
-    maxPages: parseInt(document.getElementById("fetchMaxPages").value),
+async function go(){
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid) return alert("请选择或输入店铺 ID");
+  currentShop = sid;
+  $("shopId").value = sid;
+  $("goBtn").style.display="none";
+  $("stopBtn").style.display="inline-flex";
+  $("progressWrap").style.display="block";
+  $("log").style.display="block";
+  $("log").textContent="";
+  $("resultBody").innerHTML='<div class="empty">正在处理...</div>';
+  setProgress(10, "正在抓取数据...");
+  log(`=== 店铺: ${sid} ===`);
+
+  const cookie = $("cookie").value.trim();
+  if(cookie) await post("/api/save-cookie",{cookie});
+
+  abortCtrl = new AbortController();
+  const f = await post("/api/fetch", {
+    shopId:sid,
+    beginTime:$("beginTime").value,
+    endTime:$("endTime").value,
+    pageSize:Number($("pageSize").value || 50),
+    maxPages:Number($("maxPages").value || 40),
+    filters:collectFilters(),
+    overwrite:$("overwriteCb").checked,
+    rawPayload:$("rawPayload").value.trim(),
   });
 
-  let html = "";
-  if (r.log) {
-    r.log.forEach(l => {
-      if (l.status === "ok") html += `<span class="log-ok">✅ 第${l.page}页: ${l.count}条 (共${l.total}条)</span>\n`;
-      else if (l.status === "error") html += `<span class="log-err">❌ 第${l.page}页: ${l.msg}</span>\n`;
-      else html += `<span class="log-empty">📭 第${l.page}页: 无数据</span>\n`;
+  if(f.requestBody) log(`[REQ] ${JSON.stringify(f.requestBody)}`);
+  (f.log || []).forEach(l => {
+    if(l.status === "ok") {
+      log(`[OK] 第${l.page}页 ${l.count}条 (共${l.total}条)`);
+      if(l.ids && l.ids.length) log(`[IDS] 第${l.page}页样本ID：${l.ids.join(", ")}`);
+    }
+    else if(l.status === "error") log(`[ERR] ${l.msg}`);
+    else log(`[EMPTY] 第${l.page}页`);
+  });
+  if(!f.success){ resetBtn(); return; }
+  log(`>> 新增 ${f.totalFetched || 0} 条，累计 ${f.totalStored || 0} 条`);
+  if(f.shopName){ $("m4").textContent = f.shopName; await loadShops(); }
+  if(!f.totalStored){ $("resultBody").innerHTML='<div class="empty">没有匹配数据</div>'; resetBtn(); return; }
+
+  setProgress(55, "正在分析话题...");
+  const a = await post("/api/analyze",{shopId:sid});
+  if(!a.success || a.data?.error){ log(`[ERR] ${a.data?.error || a.error || "分析失败"}`); resetBtn(); return; }
+  setProgress(90, "正在生成结果...");
+  renderAnalysis(a.data);
+  await refresh();
+  setProgress(100, "完成");
+  resetBtn();
+}
+
+function renderAnalysis(d){
+  lastAnalysis = d;
+  qaPage = 1;
+  issuePage = 1;
+  $("m1").textContent = d.totalRecords || 0;
+  $("m2").textContent = (d.topicDistribution || []).length;
+  $("m3").textContent = d.storeDiagnosis?.pendingCount || 0;
+  $("m4").textContent = `${d.storeDiagnosis?.adoptionRiskAvg || 0}%`;
+
+  let html = renderDiagnosis(d) + renderIdentityDashboard(d) + renderTopicDashboard(d) + renderKnowledgeCards(d);
+  html += '<div id="issueWorkbenchArea"></div>';
+  html += '<div id="qaPageArea"></div>';
+  $("resultBody").innerHTML = html;
+  renderIssueWorkbench();
+  renderQaPage();
+}
+
+function renderDiagnosis(d){
+  const s = d.storeDiagnosis || {};
+  const topics = (s.topIssueTopics || []).map(item => `${escapeHtml(item.topic)} ${item.count}`).join(" / ") || "-";
+  const actions = (s.actionDistribution || []).map(item => `${escapeHtml(item.action)} ${item.count}`).join(" / ") || "-";
+  let html = '<div class="diagnosis-grid">';
+  html += `<div class="diagnosis-main"><div class="score">${s.healthScore ?? "-"}</div><div class="score-label">店铺智能体健康分</div><div style="margin-top:12px;color:#dbeafe;line-height:1.6">优先处理高风险、未回复和重复追问问题，可直接转成知识卡片。</div></div>`;
+  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.issueCount || 0}</div><div class="diagnosis-label">问题簇</div></div>`;
+  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.highPriorityCount || 0}</div><div class="diagnosis-label">高优先级</div></div>`;
+  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.pendingCount || 0}</div><div class="diagnosis-label">待处理</div></div>`;
+  html += `<div class="diagnosis-card"><div class="diagnosis-value">${s.reviewCount || 0}</div><div class="diagnosis-label">待复查</div></div>`;
+  html += '</div>';
+  html += '<div class="diagnosis-summary">';
+  html += `<div class="summary-box"><b>诊断结论</b><ul>${(s.summary || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`;
+  html += `<div class="summary-box"><b>今日任务清单</b><div class="task-list">${(s.todayTasks || []).map(task => `<div class="task-item"><span>${escapeHtml(task.title)}</span><span class="task-type">${escapeHtml(task.type)}</span></div>`).join("") || '<div class="knowledge-line">暂无待办任务</div>'}</div><div class="knowledge-line" style="margin-top:8px">高频问题：${topics}</div><div class="knowledge-line">建议动作：${actions}</div></div>`;
+  html += '</div>';
+  return html;
+}
+
+function renderTopicDashboard(d){
+  const insight = d.topicInsights || {};
+  const topics = insight.topics || [];
+  const maxCount = Math.max(...topics.map(t => t.count || 0), 1);
+  let html = '<div class="topic-dashboard">';
+  html += '<div class="issue-head"><div><div class="result-title" style="margin:0">话题分析看板</div><div class="qa-count">从话题量级、风险、知识缺口和关键词四个维度定位店铺智能体问题</div></div></div>';
+  html += '<div class="topic-kpis">';
+  html += `<div class="topic-kpi"><strong>${insight.topicCount || 0}</strong><span>识别话题数</span></div>`;
+  html += `<div class="topic-kpi"><strong>${insight.coverageRate || 0}%</strong><span>样本覆盖率</span></div>`;
+  html += `<div class="topic-kpi"><strong>${insight.issueTopicCount || 0}</strong><span>存在问题的话题</span></div>`;
+  html += `<div class="topic-kpi"><strong>${insight.knowledgeGapCount || 0}</strong><span>知识缺口</span></div>`;
+  html += `<div class="topic-kpi"><strong>${insight.avgAdoptionRisk || 0}%</strong><span>平均采纳风险</span></div>`;
+  html += '</div>';
+  html += '<div class="topic-layout">';
+  html += '<div class="topic-panel"><div class="topic-panel-title">话题量级与知识缺口排行</div>';
+  if(!topics.length){
+    html += '<div class="empty">暂无话题分析数据</div>';
+  } else {
+    topics.forEach(t => {
+      const width = Math.max(4, Math.round((t.count || 0) / maxCount * 100));
+      html += '<div class="rank-row">';
+      html += `<div class="rank-name" title="${escapeHtml(t.topic)}">${escapeHtml(t.topic)}</div>`;
+      html += `<div><div class="rank-track"><div class="rank-fill" style="width:${width}%"></div></div><div class="heat-sub">问题簇 ${t.issueCount || 0} · 缺口 ${t.knowledgeGapCount || 0} · 高优 ${t.highPriorityCount || 0}</div></div>`;
+      html += `<div class="rank-meta">${t.count || 0} 条<br>${t.percentage || 0}%</div>`;
+      html += '</div>';
     });
   }
-  html += `\n<span style="color:#4ec9b0">📦 本次新增 ${r.totalFetched} 条，累计存储 ${r.totalStored} 条</span>`;
-  logEl.innerHTML = html.replace(/\n/g,"<br>");
-  refreshOverview();
-}
-
-// ── 分析 ──
-async function analyzeData() {
-  const body = document.getElementById("topicBody");
-  body.innerHTML = '<div class="loading">分析中</div>';
-
-  const r = await apiPost("/api/analyze", {});
-  if (!r.success) { body.innerHTML = `<p style="color:red">${r.data?.error || "分析失败"}</p>`; return; }
-
-  const d = r.data;
-  if (d.error) { body.innerHTML = `<p style="color:red">${d.error}</p>`; return; }
-
-  let html = '<table><tr><th>话题</th><th>数量</th><th>占比</th><th>趋势</th></tr>';
-  d.topicDistribution.forEach(t => {
-    const color = t.percentage > 20 ? "#d93025" : t.percentage > 10 ? "#b06000" : "#2e7d32";
-    html += `<tr>
-      <td><strong>${t.topic}</strong></td>
-      <td>${t.count}</td>
-      <td>${t.percentage}%</td>
-      <td><div class="progress-bar"><div class="progress-fill" style="width:${t.percentage}%;background:${color}"></div></div></td>
-    </tr>`;
+  html += '</div>';
+  html += '<div class="topic-panel"><div class="topic-panel-title">风险热区</div><div class="topic-heat">';
+  (insight.riskTopics || []).slice(0,6).forEach(t => {
+    html += `<div class="heat-card"><div class="heat-title">${escapeHtml(t.topic)}</div><div class="heat-sub">高优 ${t.highPriorityCount || 0} · 未解决 ${t.unresolvedCount || 0}</div><div class="heat-risk"><span class="badge ${riskClass(t.adoptionRisk)}">风险 ${t.adoptionRisk || 0}%</span></div></div>`;
   });
-  html += "</table>";
-
-  // 高频词
-  if (d.topKeywords && d.topKeywords.length > 0) {
-    html += '<p style="margin-top:12px;font-size:13px;color:#555"><strong>高频关键词:</strong> ';
-    html += d.topKeywords.slice(0,15).map(w => `<span class="tag tag-low">${w.word}(${w.count})</span>`).join(" ");
-    html += "</p>";
-  }
-
-  // QA 评分
-  if (d.qaScoreStats && d.qaScoreStats.count > 0) {
-    html += `<p style="margin-top:8px;font-size:13px;color:#555"><strong>QA 评分:</strong> 平均 ${d.qaScoreStats.average} | 最低 ${d.qaScoreStats.min} | 最高 ${d.qaScoreStats.max} (${d.qaScoreStats.count}条)</p>`;
-  }
-
-  body.innerHTML = html;
-  refreshOverview();
+  if(!(insight.riskTopics || []).length) html += '<div class="empty">暂无风险热区</div>';
+  html += '</div><div class="topic-panel-title" style="margin-top:14px">高频关键词</div><div class="keyword-cloud">';
+  (insight.keywords || []).forEach(k => {
+    html += `<span class="keyword">${escapeHtml(k.word)} ${k.count}</span>`;
+  });
+  html += '</div></div></div>';
+  html += '<div class="topic-panel" style="margin-top:10px"><div class="topic-panel-title">知识补齐机会</div><div class="topic-heat">';
+  (insight.gapTopics || []).slice(0,6).forEach(t => {
+    html += `<div class="heat-card"><div class="heat-title">${escapeHtml(t.topic)}</div><div class="heat-sub">待补 ${t.knowledgeGapCount || 0} 个卡片 · 动作：${escapeHtml(t.suggestedAction || "-")}</div><div class="knowledge-line">优先覆盖该话题下未回复、弱回复和重复追问样本。</div></div>`;
+  });
+  if(!(insight.gapTopics || []).length) html += '<div class="empty">暂无知识缺口</div>';
+  html += '</div></div></div>';
+  return html;
 }
 
-// ── QA 规则生成 ──
-async function generateQA() {
-  const body = document.getElementById("qaBody");
-  body.innerHTML = '<div class="loading">生成中</div>';
+function traceIdentityHtml(identity){
+  identity = identity || {};
+  const chips = [];
+  if(identity.buyerId) {
+    chips.push(buildIdentityChip("买家ID", identity.buyerId, identity.buyerIdRaw || identity.buyerId));
+  }
+  if(identity.productId) chips.push(`商品ID：${escapeHtml(identity.productId)}`);
+  if(identity.spuId) chips.push(`SPU：${escapeHtml(identity.spuId)}`);
+  if(identity.skuId) chips.push(`SKU：${escapeHtml(identity.skuId)}`);
+  if(identity.traceId) chips.push(`Trace：${escapeHtml(identity.traceId)}`);
+  if(identity.productTitle) chips.push(`商品：${escapeHtml(identity.productTitle)}`);
+  if(!chips.length) return '<div class="trace-meta"><span class="trace-chip">未抓到买家/商品线索</span></div>';
+  return `<div class="trace-meta">${chips.join("")}</div>`;
+}
 
-  const r = await apiPost("/api/generate-qa", {});
-  if (!r.success) { body.innerHTML = `<p style="color:red">生成失败</p>`; return; }
+function buildIdentityChip(label, displayText, rawText){
+  const safeDisplay = escapeHtml(displayText);
+  const safeRaw = escapeHtml(rawText);
+  const isLong = displayText.length > 32;
+  if(!isLong){
+    return `<span class="trace-chip" title="${safeDisplay}">${safeDisplay}</span>`;
+  }
+  // Store raw text in a global map keyed by chipId to avoid quoting issues
+  if(!window._chipTexts) window._chipTexts = {};
+  if(!window._chipCounter) window._chipCounter = 0;
+  window._chipCounter++;
+  const chipId = "chip_" + window._chipCounter;
+  window._chipTexts[chipId] = rawText;
+  const preview = safeDisplay.substring(0,16) + "..." + safeDisplay.substring(safeDisplay.length-12);
+  return `<span class="trace-chip" style="position:relative;cursor:pointer" onclick="toggleExpandChip('${chipId}',this)" title="点击展开查看完整${label}">${preview}</span><span id="${chipId}" class="expand-popup" data-chip-id="${chipId}" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${safeRaw}<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span>`;
+}
 
-  const d = r.data;
-  if (d.error) { body.innerHTML = `<p style="color:red">${d.error}</p>`; return; }
+function toggleExpandChip(chipId, el){
+  const popup = document.getElementById(chipId);
+  if(!popup) return;
+  const isVisible = popup.style.display !== "none";
+  document.querySelectorAll(".expand-popup").forEach(p => p.style.display = "none");
+  if(isVisible) return;
+  popup.style.display = "inline-block";
+  const rect = el.getBoundingClientRect();
+  popup.style.left = rect.left + "px";
+  popup.style.top = (rect.bottom + 4) + "px";
+}
 
-  let html = `<p style="font-size:13px;color:#555;margin-bottom:12px">共生成 <strong>${d.totalRules}</strong> 条 QA 规则</p>`;
+function doCopy(btn){
+  const popup = btn.closest(".expand-popup");
+  if(!popup) return;
+  const chipId = popup.getAttribute("data-chip-id");
+  const text = window._chipTexts ? window._chipTexts[chipId] : "";
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "已复制";
+    btn.style.background = "#039855";
+    setTimeout(() => { btn.textContent = orig; btn.style.background = "#1677ff"; }, 1500);
+  }).catch(() => {});
+}
 
-  d.rules.forEach(rule => {
-    const priTag = rule.priority === "高" ? "tag-high" : rule.priority === "中" ? "tag-mid" : "tag-low";
-    html += `<div style="margin-bottom:16px;padding:12px;background:#fafafa;border-radius:6px;border-left:3px solid #1a73e8">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:600;font-size:13px">${rule.id} ${rule.category}</span>
-        <span class="tag ${priTag}">${rule.priority}优先级</span>
-      </div>
-      <p style="font-size:13px;color:#555;margin:8px 0">${rule.rule}</p>
-      <p style="font-size:11px;color:#888;margin:4px 0">触发条件: ${rule.trigger}</p>
-      <ul class="checklist">${rule.checklist.map(c => `<li>${c}</li>`).join("")}</ul>
-    </div>`;
+// Close popups when clicking outside
+document.addEventListener("click", function(e){
+  if(!e.target.closest(".trace-chip") && !e.target.closest(".expand-popup")){
+    document.querySelectorAll(".expand-popup").forEach(p => p.style.display = "none");
+  }
+});
+
+function renderIdentityList(rows, kind){
+  if(!rows || !rows.length) return '<div class="empty">暂无可用线索</div>';
+  return `<div class="identity-list">${rows.map((row, idx) => {
+    let name = kind === "product" ? (row.productTitle || row.productId || "-") : (row.buyerId || "-");
+    const rawName = kind === "buyer" ? row.buyerId : name;
+    const isLong = typeof name === "string" && name.length > 24;
+    const display = isLong ? name.substring(0, 12) + "..." + name.substring(name.length - 12) : name;
+    const meta = kind === "product"
+      ? `商品ID：${row.productId || "-"}${row.skuId ? " / SKU：" + row.skuId : ""}`
+      : `涉及商品 ${row.productCount || 0} 个`;
+    let nameCell = `<div class="identity-name" title="${escapeHtml(rawName)}">${escapeHtml(display)}</div>`;
+    if(isLong){
+      if(!window._chipCounter) window._chipCounter = 0;
+      window._chipCounter++;
+      const chipId = "chip_" + window._chipCounter;
+      if(!window._chipTexts) window._chipTexts = {};
+      window._chipTexts[chipId] = rawName;
+      nameCell = `<div style="position:relative;display:inline-block"><div class="identity-name" style="cursor:pointer" onclick="toggleExpandChip('${chipId}',this)" title="点击展开查看完整">${escapeHtml(display)}</div><span id="${chipId}" class="expand-popup" data-chip-id="${chipId}" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${escapeHtml(rawName)}<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span></div>`;
+    }
+    return `<div class="identity-row"><div>${nameCell}<div class="identity-meta">${escapeHtml(meta)}</div></div><div class="identity-count">${row.issueCount || row.traceCount || 0}<div class="qa-count">${row.issueCount ? "问题" : "样本"}</div></div></div>`;
+  }).join("")}</div>`;
+}
+
+function renderIdentityDashboard(d){
+  const s = d.identityInsights || {};
+  let html = '<div class="identity-dashboard">';
+  html += '<div class="issue-head"><div><div class="result-title" style="margin:0">商品 / 买家线索</div><div class="qa-count">从抓取结果中提取商品ID、买家ID、SPU/SKU、Trace ID，方便定位问题商品和回查会话</div></div></div>';
+  html += '<div class="identity-grid">';
+  html += `<div class="identity-kpi"><strong>${s.productCount || 0}</strong><span>涉及商品数</span></div>`;
+  html += `<div class="identity-kpi"><strong>${s.buyerCount || 0}</strong><span>涉及买家数</span></div>`;
+  html += `<div class="identity-kpi"><strong>${s.productCoverage || 0}%</strong><span>商品线索覆盖率</span></div>`;
+  html += `<div class="identity-kpi"><strong>${s.buyerCoverage || 0}%</strong><span>买家线索覆盖率</span></div>`;
+  html += '</div>';
+  html += '<div class="identity-layout">';
+  html += `<div class="identity-panel"><div class="topic-panel-title">问题最多的商品</div>${renderIdentityList((s.issueProducts || s.topProducts || []).slice(0,6), "product")}</div>`;
+  html += `<div class="identity-panel"><div class="topic-panel-title">问题最多的买家</div>${renderIdentityList((s.issueBuyers || s.topBuyers || []).slice(0,6), "buyer")}</div>`;
+  html += '</div>';
+  html += `<div class="knowledge-line">未抓到商品线索 ${s.missingProduct || 0} 条，未抓到买家线索 ${s.missingBuyer || 0} 条；如果这里为空，说明接口当前批次没有返回对应字段。</div>`;
+  html += '</div>';
+  return html;
+}
+
+function topKnowledgeIssues(d){
+  return (d.issueWorkbench || [])
+    .filter(issue => issue.status !== "忽略")
+    .slice()
+    .sort((a,b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 6);
+}
+
+function renderKnowledgeCards(d){
+  const cards = topKnowledgeIssues(d);
+  let html = '<div class="issue-head"><div><div class="result-title" style="margin:0">待补知识卡片</div><div class="qa-count">按优先级自动生成卡片草稿，可导出后完善到知识库</div></div><button class="btn btn-sm" onclick="exportKnowledgeCardsCsv()">导出知识卡片 CSV</button></div>';
+  if(!cards.length) return html + '<div class="empty" style="margin-bottom:14px">暂无待补知识卡片</div>';
+  html += '<div class="knowledge-grid">';
+  cards.forEach(issue => {
+    const draft = issue.knowledgeCardDraft || {};
+    html += '<div class="knowledge-card">';
+    html += `<div class="knowledge-title">${escapeHtml(draft.title || issue.standardQuestion || "-")}</div>`;
+    html += `<div><span class="badge ${priorityClass(issue.priority)}">${issue.priority}</span> <span class="badge issue-type">${escapeHtml(issue.issueType || "-")}</span> <span class="badge ${riskClass(issue.adoptionRisk)}">风险 ${issue.adoptionRisk || 0}%</span></div>`;
+    html += `<div class="knowledge-line"><b>标准问：</b>${escapeHtml(draft.standardQuestion || "-")}</div>`;
+    html += `<div class="knowledge-line"><b>标准答案：</b>${escapeHtml(draft.standardAnswer || draft.answerOutline || "-")}</div>`;
+    html += `<div class="knowledge-line"><b>转人工边界：</b>${escapeHtml(draft.manualHandoffRule || "-")}</div>`;
+    html += `<div class="knowledge-line">${(draft.triggerWords || []).map(word => `<span class="kw">${escapeHtml(word)}</span>`).join("")}</div>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function filteredIssues(){
+  let rows = (lastAnalysis?.issueWorkbench || []).slice();
+  if(issueStatusFilter !== "全部") rows = rows.filter(item => item.status === issueStatusFilter);
+  if(issuePriorityFilter !== "全部") rows = rows.filter(item => item.priority === issuePriorityFilter);
+  return rows;
+}
+
+function priorityClass(priority){
+  if(priority === "高") return "badge-high";
+  if(priority === "中") return "badge-mid";
+  return "badge-low";
+}
+
+function riskClass(risk){
+  if((risk || 0) >= 70) return "risk-high";
+  if((risk || 0) >= 45) return "risk-mid";
+  return "risk-low";
+}
+
+function pagerSlots(current, totalPages){
+  if(totalPages <= 7) return Array.from({length: totalPages}, (_, i) => i + 1);
+  if(current <= 4) return [1,2,3,4,5,"...",totalPages];
+  if(current >= totalPages - 3) return [1,"...",totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+  return [1,"...",current-1,current,current+1,"...",totalPages];
+}
+
+function renderPager(kind, current, totalPages, total, pageSize){
+  const setter = kind === "issue" ? "setIssuePage" : "setQaPage";
+  const jumper = kind === "issue" ? "jumpIssuePage" : "jumpQaPage";
+  let html = '<div class="pager">';
+  html += `<div class="pager-total">共 ${total} 条 · ${pageSize} 条/页</div>`;
+  html += `<button class="page-btn" onclick="${setter}(${current - 1})" ${current <= 1 ? "disabled" : ""}>‹</button>`;
+  html += '<div class="pager-pages">';
+  pagerSlots(current, totalPages).forEach(slot => {
+    if(slot === "...") html += '<span class="page-ellipsis">…</span>';
+    else html += `<button class="page-btn ${slot === current ? "active" : ""}" onclick="${setter}(${slot})">${slot}</button>`;
+  });
+  html += '</div>';
+  html += `<button class="page-btn" onclick="${setter}(${current + 1})" ${current >= totalPages ? "disabled" : ""}>›</button>`;
+  html += `<span class="qa-count">第 ${current}/${totalPages} 页</span>`;
+  html += `<div class="pager-jump"><span>跳至</span><input id="${kind}JumpInput" type="number" min="1" max="${totalPages}" value="${current}" onkeydown="if(event.key==='Enter') ${jumper}()"><span>页</span><button class="btn btn-sm" onclick="${jumper}()">确定</button></div>`;
+  html += '</div>';
+  return html;
+}
+
+function keepPagerPosition(areaId, renderFn){
+  const area = $(areaId);
+  const pager = area ? area.querySelector(".pager") : null;
+  const beforeTop = pager ? pager.getBoundingClientRect().top : null;
+  renderFn();
+  if(beforeTop === null) return;
+  requestAnimationFrame(() => {
+    const nextArea = $(areaId);
+    const nextPager = nextArea ? nextArea.querySelector(".pager") : null;
+    if(!nextPager) return;
+    const afterTop = nextPager.getBoundingClientRect().top;
+    window.scrollBy({top: afterTop - beforeTop, left: 0, behavior: "auto"});
+  });
+}
+
+function renderIssueWorkbench(){
+  if(!lastAnalysis || !$("issueWorkbenchArea")) return;
+  const rows = filteredIssues();
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / ISSUE_PAGE_SIZE));
+  issuePage = Math.min(Math.max(issuePage, 1), totalPages);
+  const start = (issuePage - 1) * ISSUE_PAGE_SIZE;
+  const pageRows = rows.slice(start, start + ISSUE_PAGE_SIZE);
+  let html = '<div class="issue-panel">';
+  html += '<div class="issue-head">';
+  html += `<div><div class="result-title" style="margin:0">问题优化工作台</div><div class="qa-count">自动筛出未回复、弱回复和高风险问题，共 ${total} 个问题簇</div></div>`;
+  html += '<div class="issue-tools">';
+  html += `<select onchange="setIssueStatusFilter(this.value)"><option ${issueStatusFilter==="全部"?"selected":""}>全部</option><option ${issueStatusFilter==="待处理"?"selected":""}>待处理</option><option ${issueStatusFilter==="需要补知识"?"selected":""}>需要补知识</option><option ${issueStatusFilter==="需要改话术"?"selected":""}>需要改话术</option><option ${issueStatusFilter==="加转人工规则"?"selected":""}>加转人工规则</option><option ${issueStatusFilter==="已补知识"?"selected":""}>已补知识</option><option ${issueStatusFilter==="已优化话术"?"selected":""}>已优化话术</option><option ${issueStatusFilter==="复查通过"?"selected":""}>复查通过</option><option ${issueStatusFilter==="忽略"?"selected":""}>忽略</option></select>`;
+  html += `<select onchange="setIssuePriorityFilter(this.value)"><option ${issuePriorityFilter==="全部"?"selected":""}>全部</option><option ${issuePriorityFilter==="高"?"selected":""}>高</option><option ${issuePriorityFilter==="中"?"selected":""}>中</option><option ${issuePriorityFilter==="低"?"selected":""}>低</option></select>`;
+  html += '<button class="btn btn-sm" onclick="exportIssuesCsv()">导出 CSV</button>';
+  html += '</div></div>';
+  if(!total){
+    html += '<div class="empty">没有识别到待优化问题</div></div>';
+    $("issueWorkbenchArea").innerHTML = html;
+    return;
+  }
+  html += '<table><tr><th style="width:64px">优先级</th><th style="width:320px;min-width:280px">问题簇</th><th style="width:120px">失败原因</th><th style="width:96px">出现</th><th style="width:280px;min-width:240px">知识卡片建议</th><th style="width:90px">价值分</th><th style="width:220px">处理动作</th></tr>';
+  pageRows.forEach(issue => {
+    const first = (issue.examples || [])[0] || {};
+    const draft = issue.knowledgeCardDraft || {};
+    html += '<tr>';
+    html += `<td><span class="badge ${priorityClass(issue.priority)}">${issue.priority}</span></td>`;
+    html += `<td style="max-width:320px;overflow:hidden"><div class="issue-question" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(issue.standardQuestion || "-")}">${escapeHtml(issue.standardQuestion || "-")}</div><div class="issue-meta" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(issue.topic || "-")} · 示例：${escapeHtml(first.question || "-")}">${escapeHtml(issue.topic || "-")} · 示例：${escapeHtml(first.question || "-")}</div>${traceIdentityHtml(first.identity)}<div class="issue-reason" style="max-width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escapeHtml((issue.reasons || []).join("；") || "-")}</div></td>`;
+    html += `<td><span class="badge issue-type">${escapeHtml(issue.issueType || "-")}</span><div class="issue-meta">${escapeHtml(issue.failureReason || "-")}</div></td>`;
+    html += `<td>${issue.count || 0} 次<br><span class="qa-count">未解决 ${issue.unresolvedCount || 0}</span></td>`;
+    html += `<td style="max-width:280px;min-width:240px"><div><b>${escapeHtml(issue.suggestedAction || "-")}</b></div><div class="issue-suggestion" style="max-height:120px">${escapeHtml(draft.standardAnswer || draft.answerOutline || issue.trainingSuggestion || "-")}</div><div class="issue-meta" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">触发词：${(draft.triggerWords || []).map(escapeHtml).join("、") || "-"}</div><div class="issue-meta" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">转人工：${escapeHtml(draft.manualHandoffRule || "-")}</div></td>`;
+    html += `<td><span class="value-score">${issue.optimizationValue || 0}</span><div class="issue-meta">风险 ${issue.adoptionRisk || 0}%</div></td>`;
+    html += `<td><div><span class="badge issue-status">${escapeHtml(issue.status || "待处理")}</span></div><div class="mini-actions" style="margin-top:8px">`;
+    ["需要补知识","需要改话术","加转人工规则","已补知识","已优化话术","复查通过","忽略"].forEach(status => {
+      html += `<button class="btn" onclick='updateIssueStatus(${JSON.stringify(issue.id)},${JSON.stringify(status)})'>${status}</button>`;
+    });
+    html += '</div></td></tr>';
+  });
+  html += '</table>';
+  html += renderPager("issue", issuePage, totalPages, total, ISSUE_PAGE_SIZE) + '</div>';
+  $("issueWorkbenchArea").innerHTML = html;
+}
+
+function setIssuePage(page){
+  issuePage = page;
+  keepPagerPosition("issueWorkbenchArea", renderIssueWorkbench);
+}
+
+function jumpIssuePage(){
+  const value = Number($("issueJumpInput")?.value || issuePage);
+  setIssuePage(value);
+}
+
+function setIssueStatusFilter(value){
+  issueStatusFilter = value;
+  issuePage = 1;
+  renderIssueWorkbench();
+}
+
+function setIssuePriorityFilter(value){
+  issuePriorityFilter = value;
+  issuePage = 1;
+  renderIssueWorkbench();
+}
+
+async function updateIssueStatus(issueId, status){
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid) return alert("请先选择店铺");
+  const r = await post("/api/issue-status", {shopId:sid, issueId, status});
+  if(!r.success) return alert(r.error || "状态保存失败");
+  (lastAnalysis.issueWorkbench || []).forEach(issue => {
+    if(issue.id === issueId) issue.status = status;
+  });
+  renderIssueWorkbench();
+}
+
+function csvCell(value){
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function exportIssuesCsv(){
+  const rows = filteredIssues();
+  const headers = ["优先级","优化价值分","问题类型","失败原因","采纳风险","状态","问题簇","话题","出现次数","未解决数","原因","建议处理","触发词","标准问题","相似问法","标准答案","转人工边界","适用场景","不适用场景","示例问题","当前回复"];
+  const lines = [headers.map(csvCell).join(",")];
+  rows.forEach(issue => {
+    const first = (issue.examples || [])[0] || {};
+    const draft = issue.knowledgeCardDraft || {};
+    lines.push([
+      issue.priority, issue.optimizationValue, issue.issueType, issue.failureReason, issue.adoptionRisk, issue.status, issue.standardQuestion, issue.topic,
+      issue.count, issue.unresolvedCount, (issue.reasons || []).join("；"),
+      issue.suggestedAction, (draft.triggerWords || []).join("；"),
+      draft.standardQuestion || issue.standardQuestion, (draft.similarQuestions || []).join("；"),
+      draft.standardAnswer || draft.answerOutline || "", draft.manualHandoffRule || "",
+      draft.applicableScene || "", draft.notApplicableScene || "", first.question || "", first.answer || "",
+    ].map(csvCell).join(","));
+  });
+  const blob = new Blob(["\ufeff" + lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `issue-workbench-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportKnowledgeCardsCsv(){
+  const rows = topKnowledgeIssues(lastAnalysis || {});
+  const headers = ["卡片标题","优先级","优化价值分","问题类型","失败原因","采纳风险","标准问题","相似问法","触发词","标准答案","转人工边界","适用场景","不适用场景","采纳目标","出现次数","状态"];
+  const lines = [headers.map(csvCell).join(",")];
+  rows.forEach(issue => {
+    const draft = issue.knowledgeCardDraft || {};
+    lines.push([
+      draft.title || "", issue.priority, issue.optimizationValue, issue.issueType, issue.failureReason, issue.adoptionRisk,
+      draft.standardQuestion || issue.standardQuestion || "",
+      (draft.similarQuestions || []).join("；"),
+      (draft.triggerWords || []).join("；"),
+      draft.standardAnswer || draft.answerOutline || "",
+      draft.manualHandoffRule || "",
+      draft.applicableScene || "",
+      draft.notApplicableScene || "",
+      draft.acceptanceGoal || "",
+      issue.count || 0,
+      issue.status || "待处理",
+    ].map(csvCell).join(","));
+  });
+  const blob = new Blob(["\ufeff" + lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `knowledge-cards-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function flattenQaExamples(d){
+  const rows = [];
+  (d.qaExamples || []).forEach(topic => {
+    (topic.examples || []).forEach(qa => rows.push({...qa, topic: topic.topic}));
+  });
+  return rows;
+}
+
+function renderQaPage(){
+  if(!lastAnalysis || !$("qaPageArea")) return;
+  const rows = flattenQaExamples(lastAnalysis);
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / QA_PAGE_SIZE));
+  qaPage = Math.min(Math.max(qaPage, 1), totalPages);
+  const start = (qaPage - 1) * QA_PAGE_SIZE;
+  const pageRows = rows.slice(start, start + QA_PAGE_SIZE);
+  let html = '<div class="qa-panel">';
+  html += `<div class="qa-head"><div class="result-title" style="margin:0">典型 Q&A 示例</div><div class="qa-count">共 ${total} 条，每页 ${QA_PAGE_SIZE} 条</div></div>`;
+  if(!total){
+    html += '<div class="empty">暂无 Q&A 示例</div></div>';
+    $("qaPageArea").innerHTML = html;
+    return;
+  }
+  html += '<table><tr><th style="width:56px">#</th><th style="width:150px">话题</th><th>用户问题</th><th>智能体回复</th></tr>';
+  pageRows.forEach((qa, idx) => {
+    const qCell = `<div class="qa-q">${escapeHtml(qa.question || "-")}</div>${traceIdentityHtml(qa.identity)}`;
+    html += `<tr><td>${start + idx + 1}</td><td><span class="qa-topic">${escapeHtml(qa.topic || "-")}</span></td><td style="max-width:380px;overflow:hidden">${qCell}</td><td class="qa-a">${escapeHtml(qa.answer || "-")}</td></tr>`;
+  });
+  html += '</table>';
+  html += renderPager("qa", qaPage, totalPages, total, QA_PAGE_SIZE) + '</div>';
+  $("qaPageArea").innerHTML = html;
+}
+
+function setQaPage(page){
+  qaPage = page;
+  keepPagerPosition("qaPageArea", renderQaPage);
+}
+
+function jumpQaPage(){
+  const value = Number($("qaJumpInput")?.value || qaPage);
+  setQaPage(value);
+}
+
+async function refresh(){
+  const sid = $("shopId").value.trim() || currentShop;
+  const r = await get("/api/overview" + (sid ? `?shopId=${encodeURIComponent(sid)}` : ""));
+  $("m1").textContent = r.totalTraces || 0;
+  $("m2").textContent = r.totalTopics || 0;
+  $("m3").textContent = r.totalIssues || 0;
+}
+
+function stop(){ if(abortCtrl) abortCtrl.abort(); resetBtn(); }
+
+async function exportChat(){
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid) return alert("请先选择或输入店铺 ID");
+  const beginTime = $("beginTime").value;
+  const endTime = $("endTime").value;
+  const a = document.createElement("a");
+  a.href = `/api/export-chat?shopId=${encodeURIComponent(sid)}${beginTime ? "&beginTime=" + encodeURIComponent(beginTime) : ""}${endTime ? "&endTime=" + encodeURIComponent(endTime) : ""}`;
+  a.click();
+}
+
+let chatPage = 1;
+const CHAT_PAGE_SIZE = 30;
+
+function toggleChatViewer(){
+  const panel = $("chatViewerPanel");
+  if(!panel) return;
+  if(panel.style.display === "none"){
+    panel.style.display = "";
+    loadChatPage(chatPage);
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+async function loadChatPage(page){
+  page = page || 1;
+  chatPage = page;
+  const sid = $("shopId").value.trim() || currentShop;
+  if(!sid){
+    $("chatList").innerHTML = '<div class="empty" style="padding:40px">请先选择店铺</div>';
+    return;
+  }
+  $("chatList").innerHTML = '<div class="empty" style="padding:40px">加载中...</div>';
+  const beginTime = $("beginTime").value;
+  const endTime = $("endTime").value;
+  const r = await post("/api/chat-records", {
+    shopId: sid,
+    beginTime: beginTime || "",
+    endTime: endTime || "",
+    page: page,
+    pageSize: CHAT_PAGE_SIZE,
+  });
+  if(!r.success){
+    $("chatList").innerHTML = '<div class="empty" style="padding:40px">' + escapeHtml(r.error || "加载失败") + '</div>';
+    return;
+  }
+  renderChatList(r);
+}
+
+function renderChatList(r){
+  const total = r.total || 0;
+  const totalPages = r.totalPages || 1;
+  const currentPage = r.page || 1;
+  $("chatTotal").textContent = `共 ${total} 条 · 第 ${currentPage}/${totalPages} 页`;
+
+  if(!r.records || !r.records.length){
+    $("chatList").innerHTML = '<div class="empty" style="padding:40px">没有匹配的聊天记录</div>';
+    return;
+  }
+
+  let html = '<table style="width:100%">';
+  html += '<tr><th style="width:80px">时间</th><th style="width:120px">买家</th><th style="width:100px">商品</th><th>用户问题</th><th>智能体回复</th></tr>';
+
+  r.records.forEach(rec => {
+    const qText = rec.question || "-";
+    const aText = rec.answer || "-";
+    const buyerShort = rec.buyer ? (rec.buyer.length > 16 ? rec.buyer.substring(0,8)+"..."+rec.buyer.slice(-8) : rec.buyer) : "-";
+    const productShort = rec.product ? (rec.product.length > 20 ? rec.product.substring(0,18)+"..." : rec.product) : "-";
+
+    html += '<tr>';
+    html += `<td style="white-space:nowrap;color:var(--muted);font-size:12px">${escapeHtml(rec.time)}</td>`;
+    html += `<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">${escapeHtml(buyerShort)}</td>`;
+    html += `<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.product||"-")}">${escapeHtml(productShort)}</td>`;
+    html += `<td style="max-width:400px"><div style="font-weight:650;color:#0958d9;margin-bottom:4px">${escapeHtml(qText)}</div>`;
+    if(rec.topic) html += `<div style="font-size:11px;color:var(--muted)">话题：${escapeHtml(rec.topic)}</div>`;
+    html += '</td>';
+    html += `<td style="max-width:400px"><div style="color:#334155;white-space:pre-wrap;max-height:120px;overflow:auto">${escapeHtml(aText)}</div></td>`;
+    html += '</tr>';
   });
 
-  body.innerHTML = html;
-  refreshOverview();
+  html += '</table>';
+
+  // Pagination controls
+  html += '<div class="pager" style="margin-top:8px;padding:0 12px 8px">';
+  html += `<button class="page-btn" onclick="loadChatPage(${currentPage-1})" ${currentPage<=1?"disabled":""}>‹ 上一页</button>`;
+  html += `<span class="qa-count" style="margin:0 8px">第 ${currentPage} / ${totalPages} 页</span>`;
+  html += `<button class="page-btn" onclick="loadChatPage(${currentPage+1})" ${currentPage>=totalPages?"disabled":""}>下一页 ›</button>`;
+  html += '</div>';
+
+  $("chatList").innerHTML = html;
 }
 
-// ── 概览 ──
-async function refreshOverview() {
-  const r = await apiGet("/api/overview");
-  document.getElementById("mTraces").textContent = r.totalTraces;
-  const ana = await apiPost("/api/analyze", {});
-  if (ana.success && ana.data && ana.data.topicDistribution) {
-    document.getElementById("mTopics").textContent = ana.data.topicDistribution.length;
-    document.getElementById("mScore").textContent = ana.data.qaScoreStats?.average || "-";
-  }
+function jumpChatPage(){
+  const val = Number($("chatJumpInput")?.value || chatPage);
+  if(val < 1) return;
+  loadChatPage(val);
 }
 
-// 页面加载
-refreshOverview();
-loadConfig();
+init();
 </script>
 </body>
 </html>
