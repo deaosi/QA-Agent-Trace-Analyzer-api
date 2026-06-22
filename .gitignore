@@ -5,6 +5,8 @@ __pycache__/
 111/.shops.json
 111/.issue_status.json
 111/.users.json
+111/analysis_*.json
+111/traces_*.json
 111/server.log
 data/
 *.log

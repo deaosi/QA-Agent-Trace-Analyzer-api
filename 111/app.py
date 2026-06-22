@@ -22,7 +22,8 @@ except ImportError:
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get("QA_DATA_DIR", BASE_DIR)
+PROJECT_DIR = os.path.dirname(BASE_DIR)
+DATA_DIR = os.environ.get("QA_DATA_DIR", os.path.join(PROJECT_DIR, "data"))
 os.makedirs(DATA_DIR, exist_ok=True)
 COOKIE_FILE = os.path.join(DATA_DIR, ".cookies.json")
 SHOPS_FILE = os.path.join(DATA_DIR, ".shops.json")
@@ -233,11 +234,11 @@ def login():
         password = request.form.get("password", "")
         user = load_users().get(username)
         if not user or not check_password_hash(user.get("passwordHash", ""), password):
-            error = '<div class="err">账号或密码错误</div>'
+            error = "账号或密码错误"
         elif not user.get("active", True):
-            error = '<div class="err">账号已被禁用</div>'
+            error = "账号已被禁用"
         elif is_user_expired(user):
-            error = '<div class="err">账号已过期</div>'
+            error = "账号已过期"
         else:
             users = load_users()
             users[username]["lastLoginAt"] = now_iso()
@@ -259,13 +260,13 @@ def register():
         password2 = request.form.get("password2", "")
         users = load_users()
         if not valid_username(username):
-            error = '<div class="err">账号 2-32 位，支持中英文数字下划线</div>'
+            error = "账号 2-32 位，支持中英文数字下划线"
         elif username in users:
-            error = '<div class="err">账号已存在</div>'
+            error = "账号已存在"
         elif len(password) < 6:
-            error = '<div class="err">密码至少 6 位</div>'
+            error = "密码至少 6 位"
         elif password != password2:
-            error = '<div class="err">两次密码不一致</div>'
+            error = "两次密码不一致"
         else:
             users[username] = {
                 "username": username,

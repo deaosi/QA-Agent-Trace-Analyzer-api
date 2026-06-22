@@ -38,8 +38,8 @@ cp .env.example .env
 ```bash
 QA_PORT=5000
 QA_ADMIN_USERNAME=shuxing666
-QA_ADMIN_PASSWORD=asdfghjkl
-QA_ACCESS_PASSWORD=asdfghjkl
+QA_ADMIN_PASSWORD=一段强密码
+QA_ACCESS_PASSWORD=一段强密码
 QA_SECRET_KEY=一段足够长的随机字符串
 ```
 

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %}</title>
+<style>
+body{margin:0;min-height:100vh;background:#eef3f9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;color:#172033}
+.shell{min-height:100vh;display:grid;place-items:center;padding:24px}.box{width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #dfe5ee;border-radius:12px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,.08)}
+h1{font-size:20px;margin:0 0 8px}.tip{color:#64748b;font-size:13px;margin-bottom:18px;line-height:1.6}label{font-size:12px;font-weight:700;color:#475467}
+input,select{box-sizing:border-box;width:100%;height:38px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font:inherit}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.check{display:flex;align-items:center;gap:6px;color:#475467;font-size:13px}.check input{width:14px;height:14px;margin:0}
+button,.btn{width:100%;height:38px;margin-top:8px;border:0;border-radius:8px;background:#1677ff;color:#fff;font-weight:700;cursor:pointer;text-decoration:none;display:grid;place-items:center}.link{color:#175cd3;text-decoration:none;font-size:13px}.err{margin-top:12px;color:#d92d20;font-size:13px}.ok{margin-top:12px;color:#027a48;font-size:13px}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4e7ec;text-align:left;font-size:13px}th{background:#f8fafc;color:#475467}.admin{max-width:1100px;margin:0 auto;padding:24px}.panel{background:#fff;border:1px solid #dfe5ee;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.06);overflow:hidden}.panel-head{height:52px;padding:0 16px;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;justify-content:space-between}.panel-body{padding:16px}.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{width:auto;height:30px;margin:0;padding:0 10px}.danger{background:#d92d20}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}.admin{padding:12px;overflow:auto}}
+</style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

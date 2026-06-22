@@ -23,10 +23,18 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
 )
 
 if "%QA_PORT%"=="" set "QA_PORT=5000"
-if "%QA_ADMIN_USERNAME%"=="" set "QA_ADMIN_USERNAME=shuxing666"
-if "%QA_ADMIN_PASSWORD%"=="" set "QA_ADMIN_PASSWORD=asdfghjkl"
+if "%QA_ADMIN_USERNAME%"=="" set "QA_ADMIN_USERNAME=admin"
+if "%QA_ADMIN_PASSWORD%"=="" (
+  echo QA_ADMIN_PASSWORD is missing. Please edit .env or run deploy_only.bat again.
+  pause
+  exit /b 1
+)
 if "%QA_ACCESS_PASSWORD%"=="" set "QA_ACCESS_PASSWORD=%QA_ADMIN_PASSWORD%"
-if "%QA_SECRET_KEY%"=="" set "QA_SECRET_KEY=qa-workbench-default-secret-change-me"
+if "%QA_SECRET_KEY%"=="" (
+  echo QA_SECRET_KEY is missing. Please edit .env or run deploy_only.bat again.
+  pause
+  exit /b 1
+)
 if "%QA_DATA_DIR%"=="" set "QA_DATA_DIR=%CD%\data"
 
 if not exist "%QA_DATA_DIR%" mkdir "%QA_DATA_DIR%"

@@ -1,10 +1,18 @@
 @echo off
 title QA Agent Trace Analyzer
 cd /d "%~dp0"
+chcp 65001 >nul
 echo ==================================================
 echo   QA Agent Trace Analyzer
 echo   http://127.0.0.1:5000
 echo ==================================================
+if exist "%~dp0..\.env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%~dp0..\.env") do (
+    if not "%%A"=="" set "%%A=%%B"
+  )
+)
+if "%QA_DATA_DIR%"=="" set "QA_DATA_DIR=%~dp0..\data"
+if not exist "%QA_DATA_DIR%" mkdir "%QA_DATA_DIR%"
 set "PYTHON_CMD="
 where py >nul 2>nul && set "PYTHON_CMD=py"
 if not defined PYTHON_CMD where python >nul 2>nul && set "PYTHON_CMD=python"

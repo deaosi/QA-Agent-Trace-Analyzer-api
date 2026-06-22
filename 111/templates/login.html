@@ -1,0 +1,21 @@
+{% extends "auth_base.html" %}
+{% block title %}登录 - 店铺智能体训练工作台{% endblock %}
+{% block body %}
+<div class="shell">
+<form class="box" method="post">
+<h1>店铺智能体训练工作台</h1>
+<div class="tip">请输入账号密码登录。选择记住登录后，下次打开外部链接会自动进入后台。</div>
+<label>账号</label>
+<input name="username" value="{{ username or '' }}" autocomplete="username" autofocus>
+<label>密码</label>
+<input name="password" type="password" autocomplete="current-password">
+<div class="row">
+<label class="check"><input name="remember" type="checkbox" checked> 记住登录</label>
+<a class="link" href="/register">注册账号</a>
+</div>
+<button type="submit">进入后台</button>
+<div class="row" style="margin-top:12px"><a class="link" href="/admin/users">管理员入口</a></div>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+</form>
+</div>
+{% endblock %}

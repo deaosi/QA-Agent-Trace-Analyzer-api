@@ -8,11 +8,13 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(BASE_DIR)
 APP_PY = os.path.join(BASE_DIR, "app.py")
 LOG_FILE = os.path.join(BASE_DIR, "server.log")
 PORT = 5000
 HOST = "127.0.0.1"
 PID_FILE = os.path.join(BASE_DIR, ".server.pid")
+DEFAULT_DATA_DIR = os.path.join(PROJECT_DIR, "data")
 
 
 class ServicePanel(tk.Tk):
@@ -109,9 +111,13 @@ class ServicePanel(tk.Tk):
         self.clear_log()
         self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 正在启动服务...")
         try:
+            env = os.environ.copy()
+            env.setdefault("QA_DATA_DIR", DEFAULT_DATA_DIR)
+            os.makedirs(env["QA_DATA_DIR"], exist_ok=True)
             self.proc = subprocess.Popen(
                 [sys.executable, APP_PY],
                 cwd=BASE_DIR,
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

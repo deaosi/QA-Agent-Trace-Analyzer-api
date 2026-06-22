@@ -85,8 +85,8 @@ http://服务器公网IP:5000/admin/users
 默认管理员：
 
 ```text
-账号：shuxing666
-密码：asdfghjkl
+账号：查看 .env 中的 QA_ADMIN_USERNAME
+密码：查看 .env 中的 QA_ADMIN_PASSWORD
 ```
 
 ## 开放外部访问
@@ -120,10 +120,9 @@ netsh advfirewall firewall add rule name="QA Agent Workbench 5000" dir=in action
 ```text
 QA_PORT=5000
 QA_ADMIN_USERNAME=shuxing666
-QA_ADMIN_PASSWORD=asdfghjkl
-QA_ACCESS_PASSWORD=asdfghjkl
+QA_ADMIN_PASSWORD=一段强密码
+QA_ACCESS_PASSWORD=一段强密码
 QA_SECRET_KEY=change-this-to-a-long-random-string
 ```
 
 如果已经生成过 `data/.users.json`，修改 `.env` 不会覆盖已有账号。需要进入管理员后台改账号，或删除 `data/.users.json` 后重启重新初始化。
-

@@ -1,0 +1,45 @@
+{% extends "auth_base.html" %}
+{% block title %}账号后台管理{% endblock %}
+{% block body %}
+<div class="admin">
+<div class="panel">
+<div class="panel-head"><h1>账号后台管理</h1><div><a class="link" href="/">返回工作台</a> | <a class="link" href="/logout">退出</a></div></div>
+<div class="panel-body">
+<div class="grid">
+<input id="newUsername" placeholder="新账号">
+<input id="newPassword" type="password" placeholder="初始密码" autocomplete="new-password">
+<select id="newRole">
+<option value="user">普通账号</option>
+<option value="admin">管理员</option>
+</select>
+<button onclick="createUser()">新增账号</button>
+</div>
+<table>
+<thead>
+<tr>
+<th>账号</th>
+<th>角色</th>
+<th>状态</th>
+<th>到期时间</th>
+<th>最近登录</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody id="userRows"></tbody>
+</table>
+<div id="msg" class="muted" style="margin-top:12px"></div>
+</div>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(url,data){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data||{})});return r.json()}
+async function load(){const r=await fetch("/api/admin/users");const d=await r.json();$("userRows").innerHTML=(d.users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td>${u.role==="admin"?"管理员":"普通用户"}</td><td>${u.active?"启用":"禁用"}</td><td>${esc(u.expiresAt||"永久")}</td><td>${esc(u.lastLoginAt||"-")}</td><td><div class="actions"><button onclick="resetPwd(this)" data-username="${esc(u.username)}">改密码</button><button onclick="setExpire(this)" data-username="${esc(u.username)}">到期时间</button><button onclick="toggleUser(this)" data-username="${esc(u.username)}" data-active="${u.active}">${u.active?"禁用":"启用"}</button><button class="danger" onclick="delUser(this)" data-username="${esc(u.username)}">删除</button></div></td></tr>`).join("")}
+async function createUser(){const r=await api("/api/admin/users/create",{username:$("newUsername").value,password:$("newPassword").value,role:$("newRole").value});$("msg").textContent=r.success?"已新增":r.error;load()}
+async function resetPwd(btn){const username=btn.dataset.username,password=prompt("输入新密码");if(!password)return;const r=await api("/api/admin/users/update",{username,password});$("msg").textContent=r.success?"密码已修改":r.error;load()}
+async function setExpire(btn){const username=btn.dataset.username,expiresAt=prompt("到期时间，格式 2026-12-31T23:59:59；留空表示永久");if(expiresAt===null)return;const r=await api("/api/admin/users/update",{username,expiresAt});$("msg").textContent=r.success?"到期时间已更新":r.error;load()}
+async function toggleUser(btn){const username=btn.dataset.username,active=btn.dataset.active!=="true";const r=await api("/api/admin/users/update",{username,active});$("msg").textContent=r.success?"状态已更新":r.error;load()}
+async function delUser(btn){const username=btn.dataset.username;if(!confirm("确定删除账号 "+username+"?"))return;const r=await api("/api/admin/users/delete",{username});$("msg").textContent=r.success?"已删除":r.error;load()}
+load();
+</script>
+{% endblock %}
