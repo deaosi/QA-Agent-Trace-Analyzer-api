@@ -41,7 +41,7 @@ manage_server.bat
 或中文入口：
 
 ```text
-服务管理面板.bat
+服务管理.bat
 ```
 
 可以执行：
