@@ -210,9 +210,11 @@ let currentShop = "";
 let abortCtrl = null;
 let lastAnalysis = null;
 let qaPage = 1;
+let qaSearchTerm = "";
 let issuePage = 1;
 let issueStatusFilter = "全部";
 let issuePriorityFilter = "全部";
+let issueSearchTerm = "";
 const QA_PAGE_SIZE = 20;
 const ISSUE_PAGE_SIZE = 20;
 const $ = id => document.getElementById(id);
@@ -466,7 +468,11 @@ async function go(){
 function renderAnalysis(d){
   lastAnalysis = d;
   qaPage = 1;
+  qaSearchTerm = "";
   issuePage = 1;
+  issueStatusFilter = "全部";
+  issuePriorityFilter = "全部";
+  issueSearchTerm = "";
   $("m1").textContent = d.totalRecords || 0;
   $("m2").textContent = (d.topicDistribution || []).length;
   $("m3").textContent = d.storeDiagnosis?.pendingCount || 0;
@@ -566,7 +572,7 @@ function buildIdentityChip(label, displayText, rawText){
   const safeRaw = escapeHtml(rawText);
   const isLong = displayText.length > 32;
   if(!isLong){
-    return `<span class="trace-chip" title="${safeDisplay}">${safeDisplay}</span>`;
+    return '<span class="trace-chip" title="' + safeDisplay + '">' + safeDisplay + '</span><button class="btn btn-sm" style="height:20px;padding:0 5px;font-size:10px;line-height:1;margin-left:2px" data-copy-buyer="' + safeRaw + '" title="复制' + label + '">复制</button>';
   }
   // Store raw text in a global map keyed by chipId to avoid quoting issues
   if(!window._chipTexts) window._chipTexts = {};
@@ -575,7 +581,7 @@ function buildIdentityChip(label, displayText, rawText){
   const chipId = "chip_" + window._chipCounter;
   window._chipTexts[chipId] = rawText;
   const preview = safeDisplay.substring(0,16) + "..." + safeDisplay.substring(safeDisplay.length-12);
-  return `<span class="trace-chip" style="position:relative;cursor:pointer" onclick="toggleExpandChip('${chipId}',this)" title="点击展开查看完整${label}">${preview}</span><span id="${chipId}" class="expand-popup" data-chip-id="${chipId}" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${safeRaw}<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span>`;
+  return '<span class="trace-chip" style="position:relative;cursor:pointer" onclick="toggleExpandChip(\'' + chipId + '\',this)" title="点击展开查看完整' + label + '">' + preview + '</span><button class="btn btn-sm" style="height:20px;padding:0 5px;font-size:10px;line-height:1;margin-left:2px" data-copy-buyer="' + safeRaw + '" title="复制' + label + '">复制</button><span id="' + chipId + '" class="expand-popup" data-chip-id="' + chipId + '" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">' + safeRaw + '<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span>';
 }
 
 function toggleExpandChip(chipId, el){
@@ -608,6 +614,18 @@ document.addEventListener("click", function(e){
   if(!e.target.closest(".trace-chip") && !e.target.closest(".expand-popup")){
     document.querySelectorAll(".expand-popup").forEach(p => p.style.display = "none");
   }
+  // Handle copy buyer nickname buttons
+  if(e.target.matches("[data-copy-buyer]")){
+    const text = e.target.getAttribute("data-copy-buyer");
+    navigator.clipboard.writeText(text).then(function(){
+      var orig = e.target.textContent;
+      e.target.textContent = "已复制";
+      e.target.style.background = "#039855";
+      e.target.style.borderColor = "#039855";
+      e.target.style.color = "#fff";
+      setTimeout(function(){ e.target.textContent = orig; e.target.style.background = ""; e.target.style.borderColor = ""; e.target.style.color = ""; }, 1200);
+    }).catch(function(){});
+  }
 });
 
 function renderIdentityList(rows, kind){
@@ -627,7 +645,7 @@ function renderIdentityList(rows, kind){
       const chipId = "chip_" + window._chipCounter;
       if(!window._chipTexts) window._chipTexts = {};
       window._chipTexts[chipId] = rawName;
-      nameCell = `<div style="position:relative;display:inline-block"><div class="identity-name" style="cursor:pointer" onclick="toggleExpandChip('${chipId}',this)" title="点击展开查看完整">${escapeHtml(display)}</div><span id="${chipId}" class="expand-popup" data-chip-id="${chipId}" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${escapeHtml(rawName)}<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span></div>`;
+      nameCell = '<div style="position:relative;display:inline-block"><div class="identity-name" style="cursor:pointer" onclick="toggleExpandChip(\'' + chipId + '\',this)" title="点击展开查看完整">' + escapeHtml(display) + '</div><button class="btn btn-sm" style="height:20px;padding:0 5px;font-size:10px;line-height:1;margin-left:2px" data-copy-buyer="' + escapeHtml(rawName) + '" title="复制买家昵称">复制</button><span id="' + chipId + '" class="expand-popup" data-chip-id="' + chipId + '" style="display:none;position:fixed;z-index:1000;background:#1e293b;color:#f8fafc;padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:420px;overflow:hidden;text-overflow:ellipsis;pointer-events:none">' + escapeHtml(rawName) + '<span style="pointer-events:auto"><button class="btn btn-sm" style="height:22px;padding:0 8px;margin-left:8px;background:#1677ff;border-color:#1677ff;color:#fff;font-size:11px" onclick="event.stopPropagation();doCopy(this)">复制</button></span></span></div>';
     }
     return `<div class="identity-row"><div>${nameCell}<div class="identity-meta">${escapeHtml(meta)}</div></div><div class="identity-count">${row.issueCount || row.traceCount || 0}<div class="qa-count">${row.issueCount ? "问题" : "样本"}</div></div></div>`;
   }).join("")}</div>`;
@@ -684,6 +702,18 @@ function filteredIssues(){
   let rows = (lastAnalysis?.issueWorkbench || []).slice();
   if(issueStatusFilter !== "全部") rows = rows.filter(item => item.status === issueStatusFilter);
   if(issuePriorityFilter !== "全部") rows = rows.filter(item => item.priority === issuePriorityFilter);
+  if(issueSearchTerm) {
+    const q = issueSearchTerm.toLowerCase();
+    rows = rows.filter(item => {
+      const fields = [
+        item.topic, item.standardQuestion, item.issueType, item.failureReason,
+        item.suggestedAction, item.priority, item.status,
+        (item.reasons || []).join(" "),
+        (item.knowledgeCardDraft?.triggerWords || []).join(" "),
+      ];
+      return fields.some(f => (f || "").toLowerCase().includes(q));
+    });
+  }
   return rows;
 }
 
@@ -750,14 +780,19 @@ function renderIssueWorkbench(){
   const pageRows = rows.slice(start, start + ISSUE_PAGE_SIZE);
   let html = '<div class="issue-panel">';
   html += '<div class="issue-head">';
-  html += `<div><div class="result-title" style="margin:0">问题优化工作台</div><div class="qa-count">自动筛出未回复、弱回复和高风险问题，共 ${total} 个问题簇</div></div>`;
+  html += `<div><div class="result-title" style="margin:0">问题优化工作台</div><div class="qa-count">自动筛出未回复、弱回复和高风险问题，共 ${total} 个问题簇${issueSearchTerm ? '（已搜索 "' + escapeHtml(issueSearchTerm) + '"）' : ''}</div></div>`;
   html += '<div class="issue-tools">';
+  html += '<input id="issueSearchInput" type="text" placeholder="搜索话题、标准问、类型、失败原因…" style="width:240px;height:28px;padding:0 8px;font-size:12px" data-search-value="' + (issueSearchTerm || '') + '" onkeydown="if(event.key===\"Enter\")doIssueSearch()"><span id="issueSearchHint" class="qa-count" style="margin-left:4px"></span>';
+  html += '<button class="btn btn-sm" style="height:28px" onclick="doIssueSearch()">搜索</button>';
+  if(issueSearchTerm) html += '<button class="btn btn-sm" style="height:28px" onclick="clearIssueSearch()">✕ 清除</button>';
   html += `<select onchange="setIssueStatusFilter(this.value)"><option ${issueStatusFilter==="全部"?"selected":""}>全部</option><option ${issueStatusFilter==="待处理"?"selected":""}>待处理</option><option ${issueStatusFilter==="需要补知识"?"selected":""}>需要补知识</option><option ${issueStatusFilter==="需要改话术"?"selected":""}>需要改话术</option><option ${issueStatusFilter==="加转人工规则"?"selected":""}>加转人工规则</option><option ${issueStatusFilter==="已补知识"?"selected":""}>已补知识</option><option ${issueStatusFilter==="已优化话术"?"selected":""}>已优化话术</option><option ${issueStatusFilter==="复查通过"?"selected":""}>复查通过</option><option ${issueStatusFilter==="忽略"?"selected":""}>忽略</option></select>`;
   html += `<select onchange="setIssuePriorityFilter(this.value)"><option ${issuePriorityFilter==="全部"?"selected":""}>全部</option><option ${issuePriorityFilter==="高"?"selected":""}>高</option><option ${issuePriorityFilter==="中"?"selected":""}>中</option><option ${issuePriorityFilter==="低"?"selected":""}>低</option></select>`;
   html += '<button class="btn btn-sm" onclick="exportIssuesCsv()">导出 CSV</button>';
   html += '</div></div>';
   if(!total){
-    html += '<div class="empty">没有识别到待优化问题</div></div>';
+    let hint = '没有识别到待优化问题';
+    if(issueSearchTerm) hint = '未找到匹配 "' + escapeHtml(issueSearchTerm) + '" 的结果 <button class="btn btn-sm" style="height:22px;padding:0 8px;font-size:11px;margin-left:8px" onclick="clearIssueSearch()">清除搜索</button>';
+    html += '<div class="empty">' + hint + '</div></div>';
     $("issueWorkbenchArea").innerHTML = html;
     return;
   }
@@ -776,7 +811,7 @@ function renderIssueWorkbench(){
     html += `<td><span class="value-score">${issue.optimizationValue || 0}</span><div class="issue-meta">风险 ${issue.adoptionRisk || 0}%</div></td>`;
     html += `<td><div><span class="badge issue-status">${escapeHtml(issue.status || "待处理")}</span></div><div class="mini-actions" style="margin-top:8px">`;
     ["需要补知识","需要改话术","加转人工规则","已补知识","已优化话术","复查通过","忽略"].forEach(status => {
-      html += `<button class="btn" onclick="event.stopPropagation();updateIssueStatus(${JSON.stringify(issue.id)},${JSON.stringify(status)})">${status}</button>`;
+      html += '<button class="btn" data-issue-id="' + escapeHtml(issue.id) + '" data-issue-status="' + escapeHtml(status) + '" onclick="event.stopPropagation();updateIssueStatus(this)">' + status + '</button>';
     });
     html += '</div></td></tr>';
     // Expanded detail row
@@ -809,14 +844,38 @@ function setIssuePriorityFilter(value){
   renderIssueWorkbench();
 }
 
-async function updateIssueStatus(issueId, status){
+function onIssueSearch(value){
+  issueSearchTerm = value.trim();
+  issuePage = 1;
+  renderIssueWorkbench();
+}
+
+function doIssueSearch(){
+  var input = $("issueSearchInput");
+  issueSearchTerm = input ? input.value.trim() : "";
+  issuePage = 1;
+  renderIssueWorkbench();
+}
+
+function clearIssueSearch(){
+  issueSearchTerm = "";
+  renderIssueWorkbench();
+}
+
+async function updateIssueStatus(btn){
+  const issueId = btn.getAttribute("data-issue-id");
+  const status = btn.getAttribute("data-issue-status");
   const sid = $("shopId").value.trim() || currentShop;
   if(!sid) return alert("请先选择店铺");
-  const r = await post("/api/issue-status", {shopId:sid, issueId, status});
+  const r = await post("/api/issue-status", {shopId:sid, issueId: issueId, status: status});
   if(!r.success) return alert(r.error || "状态保存失败");
   (lastAnalysis.issueWorkbench || []).forEach(issue => {
     if(issue.id === issueId) issue.status = status;
   });
+  // Update button appearance
+  btn.style.background = "#ecfdf3";
+  btn.style.borderColor = "#027a48";
+  btn.style.color = "#027a48";
   renderIssueWorkbench();
 }
 
@@ -895,7 +954,16 @@ async function loadIssueDetail(issueId){
 
     // Header: trace info
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:var(--muted)">';
-    html += '<span title="' + escapeHtml(rec.buyer || "-") + '">' + escapeHtml((rec.buyer || "-").substring(0, 16)) + (rec.buyer && rec.buyer.length > 16 ? '...' : '') + '</span>';
+    if(rec.buyer && rec.buyer !== "-"){
+      const buyerEscaped = escapeHtml(rec.buyer);
+      const buyerShort = rec.buyer.length > 16 ? rec.buyer.substring(0, 16) : rec.buyer;
+      html += '<span style="display:inline-flex;align-items:center;gap:4px">';
+      html += '<span title="' + buyerEscaped + '" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(buyerShort) + '</span>';
+      html += '<button class="btn btn-sm" style="height:20px;padding:0 5px;font-size:10px;line-height:1;flex-shrink:0" data-copy-buyer="' + buyerEscaped + '" title="复制买家昵称">复制</button>';
+      html += '</span>';
+    } else {
+      html += '<span>-</span>';
+    }
     html += '<span>›</span>';
     html += '<span>' + escapeHtml(rec.time) + '</span>';
     if(rec.product){
@@ -990,26 +1058,42 @@ function exportKnowledgeCardsCsv(){
   URL.revokeObjectURL(url);
 }
 
-function flattenQaExamples(d){
+function flattenQaExamples(d, searchTerm){
   const rows = [];
   (d.qaExamples || []).forEach(topic => {
     (topic.examples || []).forEach(qa => rows.push({...qa, topic: topic.topic}));
   });
+  if(searchTerm){
+    const q = searchTerm.toLowerCase();
+    return rows.filter(item => {
+      const fields = [item.topic, item.question, item.answer, (item.identity || {}).buyerId || ""];
+      return fields.some(f => (f || "").toString().toLowerCase().includes(q));
+    });
+  }
   return rows;
 }
 
 function renderQaPage(){
   if(!lastAnalysis || !$("qaPageArea")) return;
-  const rows = flattenQaExamples(lastAnalysis);
+  const rows = flattenQaExamples(lastAnalysis, qaSearchTerm);
   const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / QA_PAGE_SIZE));
   qaPage = Math.min(Math.max(qaPage, 1), totalPages);
   const start = (qaPage - 1) * QA_PAGE_SIZE;
   const pageRows = rows.slice(start, start + QA_PAGE_SIZE);
   let html = '<div class="qa-panel">';
-  html += `<div class="qa-head"><div class="result-title" style="margin:0">典型 Q&A 示例</div><div class="qa-count">共 ${total} 条，每页 ${QA_PAGE_SIZE} 条</div></div>`;
+  html += '<div class="qa-head">';
+  html += '<div class="result-title" style="margin:0">典型 Q&A 示例</div>';
+  html += '<div style="display:flex;align-items:center;gap:8px">';
+  html += '<input id="qaSearchInput" type="text" placeholder="搜索话题、用户问题、智能体回复…" style="width:240px;height:28px;padding:0 8px;font-size:12px" data-search-value="' + (qaSearchTerm || '') + '" onkeydown="if(event.key===\"Enter\")doQaSearch()"><span id="qaSearchHint" class="qa-count"></span>';
+  html += '<button class="btn btn-sm" style="height:28px" onclick="doQaSearch()">搜索</button>';
+  if(qaSearchTerm) html += '<button class="btn btn-sm" style="height:28px" onclick="clearQaSearch()">✕ 清除</button>';
+  html += '<span class="qa-count">共 ' + total + ' 条，每页 ' + QA_PAGE_SIZE + ' 条</span>';
+  html += '</div></div>';
   if(!total){
-    html += '<div class="empty">暂无 Q&A 示例</div></div>';
+    let hint = '暂无 Q&A 示例';
+    if(qaSearchTerm) hint = '未找到匹配 "' + escapeHtml(qaSearchTerm) + '" 的结果 <button class="btn btn-sm" style="height:22px;padding:0 8px;font-size:11px;margin-left:8px" onclick="clearQaSearch()">清除搜索</button>';
+    html += '<div class="empty">' + hint + '</div></div>';
     $("qaPageArea").innerHTML = html;
     return;
   }
@@ -1031,6 +1115,24 @@ function setQaPage(page){
 function jumpQaPage(){
   const value = Number($("qaJumpInput")?.value || qaPage);
   setQaPage(value);
+}
+
+function onQaSearch(value){
+  qaSearchTerm = value.trim();
+  qaPage = 1;
+  renderQaPage();
+}
+
+function doQaSearch(){
+  var input = $("qaSearchInput");
+  qaSearchTerm = input ? input.value.trim() : "";
+  qaPage = 1;
+  renderQaPage();
+}
+
+function clearQaSearch(){
+  qaSearchTerm = "";
+  renderQaPage();
 }
 
 async function refresh(){
@@ -1121,7 +1223,12 @@ function renderChatList(r){
 
     html += '<tr>';
     html += `<td style="white-space:nowrap;color:var(--muted);font-size:12px">${escapeHtml(rec.time)}</td>`;
-    html += `<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">${escapeHtml(buyerShort)}</td>`;
+    html += `<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <span style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">${escapeHtml(buyerShort)}</span>
+        ${rec.buyer && rec.buyer !== "-" ? '<button class="btn btn-sm" style="height:22px;padding:0 6px;font-size:11px;line-height:1" data-copy-buyer="' + escapeHtml(rec.buyer) + '" title="复制买家昵称">复制</button>' : ''}
+      </span>
+    </td>`;
     html += `<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.product||"-")}">${escapeHtml(productShort)}</td>`;
     html += `<td style="max-width:400px"><div style="font-weight:650;color:#0958d9;margin-bottom:4px">${escapeHtml(qText)}</div>`;
     if(rec.topic) html += `<div style="font-size:11px;color:var(--muted)">话题：${escapeHtml(rec.topic)}</div>`;
