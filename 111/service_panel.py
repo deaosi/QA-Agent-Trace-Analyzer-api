@@ -27,8 +27,14 @@ class ServicePanel(tk.Tk):
         self.geometry("520x480")
         self.resizable(False, False)
         self.configure(bg="#f0f2f5")
+        # Ensure window is visible
+        self.attributes("-topmost", False)
         self.build_ui()
         self.check_status()
+        # Force show the window
+        self.deiconify()
+        self.lift()
+        self.focus_force()
 
     def build_ui(self):
         # Title
@@ -61,6 +67,8 @@ class ServicePanel(tk.Tk):
         # Open URL
         url_btn = ttk.Button(btn_frame, text="🌐 打开网页", command=self.open_url)
         url_btn.pack(side="left", expand=True, fill="x", padx=2)
+        url_ai_btn = ttk.Button(btn_frame, text="🤖 AI 分析", command=self.open_ai_url)
+        url_ai_btn.pack(side="left", expand=True, fill="x", padx=2)
 
         # Log area
         log_frame = ttk.LabelFrame(self, text="日志输出", padding=8)
@@ -158,6 +166,10 @@ class ServicePanel(tk.Tk):
     def open_url(self):
         import webbrowser
         webbrowser.open(f"http://{HOST}:{PORT}")
+
+    def open_ai_url(self):
+        import webbrowser
+        webbrowser.open(f"http://{HOST}:{PORT}/?tab=ai")
 
     def read_stdout(self):
         if not self.proc:

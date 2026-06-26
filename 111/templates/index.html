@@ -55,6 +55,11 @@ td{overflow-wrap:break-word;word-break:break-all}
 .issue-panel{margin-bottom:18px}.issue-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}.issue-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.issue-tools select{width:120px}.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}.badge-high{background:#fef3f2;color:#b42318}.badge-mid{background:#fffaeb;color:#b54708}.badge-low{background:#ecfdf3;color:#027a48}.issue-type{background:#eef4ff;color:#175cd3}.issue-status{background:#f2f4f7;color:#344054}.risk-high{background:#fef3f2;color:#b42318}.risk-mid{background:#fff7ed;color:#c2410c}.risk-low{background:#ecfdf3;color:#027a48}.issue-question{font-weight:750;color:#101828}.issue-meta{margin-top:4px;color:var(--muted);font-size:12px}.issue-reason{color:#7a271a;font-size:12px;margin-top:5px}.issue-suggestion{color:#344054;font-size:12px;line-height:1.5;margin-top:5px}.mini-actions{display:flex;gap:6px;flex-wrap:wrap}.mini-actions .btn{height:26px;padding:0 8px;font-size:12px}
 .qa-panel{margin-top:18px}.qa-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.qa-count{font-size:12px;color:var(--muted);font-weight:500}.qa-topic{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f2f4f7;color:#344054;font-size:12px;font-weight:650}.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}.pager-total{color:#475467;font-size:12px;margin-right:auto}.pager-pages{display:grid;grid-template-columns:repeat(7,32px);gap:4px}.page-btn{height:30px;min-width:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:#344054;font-weight:650;cursor:pointer}.page-btn:hover{border-color:var(--primary);color:var(--primary)}.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}.page-btn:disabled{cursor:not-allowed;opacity:.45;border-color:var(--line);color:var(--muted)}.page-ellipsis{height:30px;display:grid;place-items:center;color:var(--muted);font-weight:700}.pager-jump{display:flex;align-items:center;gap:6px;color:#475467;font-size:12px}.pager-jump input{width:48px;height:30px;text-align:center}.pager-size{height:30px;width:auto;min-width:92px}
 .cookie-output{min-height:92px}.muted-line{color:var(--muted);font-size:12px;margin-top:6px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
+/* Tab navigation */
+.tab-nav{display:flex;gap:4px;margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:var(--shadow)}.tab-btn{flex:1;height:36px;border:none;border-radius:8px;background:transparent;color:#475467;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s}.tab-btn:hover{background:#f8fafc;color:var(--primary)}.tab-btn.active{background:var(--primary);color:#fff}.tab-btn[data-tab="ai"].active{background:var(--indigo)}.tab-btn[data-tab="ai"]:hover{background:#f2f0ff;color:var(--indigo)}.tab-panel{display:none}.tab-panel.active{display:block}
+/* AI config form */
+.ai-provider-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.ai-provider-btn{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .15s}.ai-provider-btn:hover{border-color:var(--primary);color:var(--primary)}.ai-provider-btn.active{border-color:var(--primary);background:#eef4ff;color:var(--primary)}.ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ai-form-grid .field{min-width:0}
+@media(max-width:600px){.ai-provider-grid{grid-template-columns:1fr}.ai-form-grid{grid-template-columns:1fr}}
 @media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}.brand span{font-size:15px}.settings-menu{right:-2px}}
 </style>
 </head>
@@ -74,6 +79,12 @@ td{overflow-wrap:break-word;word-break:break-all}
   </div>
 </header>
 <main class="page">
+  <!-- Tab Navigation -->
+  <nav class="tab-nav" style="margin-bottom:16px">
+    <button class="tab-btn active" data-tab="local" onclick="switchTab('local')" style="font-size:14px;height:40px">📊 本地分析</button>
+    <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')" style="font-size:14px;height:40px">🤖 AI 分析</button>
+  </nav>
+
   <section class="metrics">
     <div class="metric"><div class="metric-value" id="m1">0</div><div class="metric-label">已抓取 Trace</div></div>
     <div class="metric"><div class="metric-value" id="m2">0</div><div class="metric-label">识别话题</div></div>
@@ -81,7 +92,12 @@ td{overflow-wrap:break-word;word-break:break-all}
     <div class="metric"><div class="metric-value" id="m4">-</div><div class="metric-label">采纳风险/当前店铺</div></div>
   </section>
 
+  <!-- Local Analysis Panel (existing) -->
+  <div class="tab-panel active" id="panel-local">
   <section class="layout">
+    <div style="text-align:right;padding:4px 0 8px 0">
+      <button class="btn btn-primary" onclick="switchTab('ai')" style="height:30px;font-size:12px">🤖 切换到 AI 分析</button>
+    </div>
     <aside class="stack">
       <section class="card">
         <div class="card-header"><span>Cookie 拼接助手</span><span id="shopStatus" class="pill">未检测</span></div>
@@ -204,6 +220,80 @@ td{overflow-wrap:break-word;word-break:break-all}
       </section>
     </section>
   </section>
+  </div>
+  <!-- /panel-local -->
+
+  <!-- AI Analysis Panel -->
+  <div class="tab-panel" id="panel-ai">
+    <div style="text-align:right;padding:4px 0 8px 0">
+      <button class="btn" onclick="switchTab('local')" style="height:30px;font-size:12px">📊 切换回本地分析</button>
+    </div>
+    <section class="stack">
+      <!-- AI Config Card -->
+      <section class="card">
+        <div class="card-header"><span>🔧 API 配置</span><span class="pill" id="aiConfigStatus">未配置</span></div>
+        <div class="card-body">
+          <div class="section-title">选择提供商</div>
+          <div class="ai-provider-grid">
+            <div class="ai-provider-btn active" data-provider="agnes" onclick="selectProvider('agnes')">Agnes AI</div>
+            <div class="ai-provider-btn" data-provider="openai" onclick="selectProvider('openai')">OpenAI</div>
+            <div class="ai-provider-btn" data-provider="anthropic" onclick="selectProvider('anthropic')">Anthropic</div>
+          </div>
+          <div class="ai-provider-grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
+            <div class="field"><label>Base URL</label><input id="aiBaseUrl" placeholder="https://api.xxx.com/v1" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+            <div class="field"><label>Model</label><input id="aiModel" placeholder="agnes-4" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+            <div class="field"><label>API Key</label><input id="aiApiKey" type="password" placeholder="sk-..." onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+          </div>
+          <div class="ai-form-grid" style="margin-top:10px">
+            <div class="field"><label>Temperature</label><input id="aiTemperature" type="number" min="0" max="2" step="0.1" value="0.3"></div>
+            <div class="field"><label>Max Tokens</label><input id="aiMaxTokens" type="number" min="1" value="4096"></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px">
+            <div class="action-row">
+              <button class="btn btn-primary btn-sm" onclick="saveAiConfig()">保存配置</button>
+              <button class="btn btn-sm" onclick="testAiConnection()">测试连接</button>
+            </div>
+            <span id="aiTestResult" class="status"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI Run Analysis Card -->
+      <section class="card">
+        <div class="card-header"><span>🤖 AI 深度分析</span></div>
+        <div class="card-body">
+          <div class="section-title">使用说明</div>
+          <div class="knowledge-line" style="line-height:1.7">
+            使用 AI 对当前店铺的 trace 数据进行深度分析，包括智能分类、根因诊断、知识卡片生成和优化建议。<br>
+            需要先选择店铺并抓取数据，然后配置好 API。
+          </div>
+          <div class="toolbar" style="margin-top:14px">
+            <div class="action-row">
+              <button class="btn btn-primary" id="aiGoBtn" onclick="runAiAnalysis()">运行 AI 分析</button>
+              <button class="btn btn-danger" id="aiStopBtn" style="display:none" onclick="cancelAiAnalysis()">停止</button>
+              <button class="btn" onclick="clearAiResults()">清空结果</button>
+            </div>
+            <span id="aiRunStatus" class="status"></span>
+          </div>
+          <div class="progress" id="aiProgressWrap" style="margin-top:12px">
+            <div class="progress-track"><div class="progress-bar" id="aiProgressBar"></div></div>
+            <div class="progress-meta"><span id="aiProgressLabel"></span><span id="aiProgressPct"></span></div>
+          </div>
+          <div class="log" id="aiLog"></div>
+        </div>
+      </section>
+
+      <!-- AI Results Card -->
+      <section class="card" id="aiResultCard" style="display:none">
+        <div class="card-header"><span>📊 AI 分析结果</span><button class="btn btn-sm" onclick="exportAiResults()">导出 CSV</button></div>
+        <div class="card-body" id="aiResultBody">
+          <div class="empty">暂无分析结果</div>
+        </div>
+      </section>
+    </section>
+  </div>
+  <!-- /panel-ai -->
+
 </main>
 <script>
 let currentShop = "";
@@ -234,6 +324,12 @@ async function init(){
   if (r.hasCookie) $("cookie").placeholder = "已保存，不需要重复填写";
   await loadShops();
   updateFilterSummary();
+
+  // Check URL param ?tab=ai from service_panel "AI 分析" button
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("tab") === "ai") {
+    switchTab("ai");
+  }
 }
 
 async function loadCurrentUser(){
@@ -1253,6 +1349,306 @@ function jumpChatPage(){
   const val = Number($("chatJumpInput")?.value || chatPage);
   if(val < 1) return;
   loadChatPage(val);
+}
+
+// ============================================================
+// AI Analysis tab functions
+// ============================================================
+
+let aiAbortCtrl = null;
+let aiLastResult = null;
+let currentAiProvider = "agnes";
+
+async function switchTab(tab){
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  document.querySelectorAll(".tab-panel").forEach(panel => {
+    panel.classList.toggle("active", panel.id === "panel-" + tab);
+  });
+  if(tab === "ai" && !window._aiLoaded){
+    window._aiLoaded = true;
+    await loadAiConfig();
+  }
+}
+
+async function loadAiConfig(){
+  try {
+    const r = await get("/api/ai/config");
+    if(!r.success) return;
+    const cfg = r.config;
+    const prov = cfg.providers[cfg.activeProvider] || cfg.providers.agnes;
+    currentAiProvider = cfg.activeProvider;
+
+    $("aiBaseUrl").value = prov.baseUrl || "";
+    $("aiModel").value = prov.model || "";
+    $("aiApiKey").value = prov.apiKey ? "" : prov.apiKey; // blank if masked
+    $("aiApiKey").placeholder = prov.apiKey ? "已配置" : "sk-...";
+    $("aiTemperature").value = cfg.temperature || 0.3;
+    $("aiMaxTokens").value = cfg.maxTokens || 4096;
+
+    // Update provider buttons
+    document.querySelectorAll(".ai-provider-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.provider === cfg.activeProvider);
+    });
+
+    $("aiConfigStatus").textContent = prov.apiKey ? "已配置" : "未配置";
+  } catch(e) {
+    console.error("loadAiConfig error:", e);
+  }
+}
+
+function selectProvider(name){
+  currentAiProvider = name;
+  document.querySelectorAll(".ai-provider-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.provider === name);
+  });
+}
+
+async function saveAiConfig(){
+  const baseUrl = $("aiBaseUrl").value.trim();
+  const model = $("aiModel").value.trim();
+  const apiKey = $("aiApiKey").value.trim();
+  const temperature = parseFloat($("aiTemperature").value) || 0.3;
+  const maxTokens = parseInt($("aiMaxTokens").value) || 4096;
+
+  if(!baseUrl || !model){
+    alert("请填写 Base URL 和 Model");
+    return;
+  }
+
+  const payload = {
+    activeProvider: currentAiProvider,
+    baseUrl: baseUrl,
+    model: model,
+    temperature: temperature,
+    maxTokens: maxTokens,
+  };
+  // Only send apiKey if user actually typed something (don't overwrite saved key)
+  if(apiKey) payload.apiKey = apiKey;
+
+  const r = await post("/api/ai/config", payload);
+
+  if(r.success){
+    $("aiConfigStatus").textContent = "已保存";
+    alert("配置已保存");
+  } else {
+    alert("保存失败: " + (r.error || "未知错误"));
+  }
+}
+
+async function testAiConnection(){
+  const resultEl = $("aiTestResult");
+  resultEl.textContent = "测试中...";
+  resultEl.style.color = "var(--muted)";
+
+  try {
+    const r = await post("/api/ai/test", {});
+    if(r.success){
+      resultEl.textContent = "✓ 连接成功: " + (r.response || "OK");
+      resultEl.style.color = "var(--success)";
+    } else {
+      resultEl.textContent = "✗ 连接失败: " + (r.error || "未知错误");
+      resultEl.style.color = "var(--danger)";
+    }
+  } catch(e){
+    resultEl.textContent = "✗ 网络错误: " + e.message;
+    resultEl.style.color = "var(--danger)";
+  }
+}
+
+function aiLog(msg){
+  const el = $("aiLog");
+  el.style.display = "block";
+  el.textContent += msg + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+function setAiProgress(pct, label){
+  $("aiProgressBar").style.width = pct + "%";
+  $("aiProgressPct").textContent = pct + "%";
+  $("aiProgressLabel").textContent = label;
+}
+
+async function runAiAnalysis(){
+  const sid = $("shopId")?.value.trim() || currentShop;
+  if(!sid) return alert("请先选择或输入店铺 ID");
+
+  currentShop = sid;
+  $("aiGoBtn").style.display = "none";
+  $("aiStopBtn").style.display = "inline-flex";
+  $("aiProgressWrap").style.display = "block";
+  $("aiLog").style.display = "block";
+  $("aiLog").textContent = "";
+  $("aiResultCard").style.display = "none";
+  $("aiRunStatus").textContent = "分析中...";
+
+  aiAbortCtrl = new AbortController();
+  setAiProgress(10, "正在调用 AI 分析...");
+  aiLog(`=== 店铺: ${sid} ===`);
+
+  try {
+    const r = await post("/api/ai/analyze", {shopId: sid});
+    if(!r.success){
+      aiLog("[ERR] " + (r.error || "分析失败"));
+      $("aiRunStatus").textContent = "分析失败";
+      resetAiBtn();
+      return;
+    }
+
+    setAiProgress(90, "正在渲染结果...");
+    aiLog("[OK] AI 分析完成");
+    aiLastResult = r.data;
+    renderAiResults(r.data);
+    setAiProgress(100, "完成");
+    $("aiRunStatus").textContent = "分析完成";
+  } catch(e){
+    aiLog("[ERR] " + e.message);
+    $("aiRunStatus").textContent = "分析出错";
+  }
+
+  resetAiBtn();
+}
+
+function cancelAiAnalysis(){
+  if(aiAbortCtrl) aiAbortCtrl.abort();
+  resetAiBtn();
+  $("aiLog").textContent += "[CANCELLED]\n";
+}
+
+function resetAiBtn(){
+  $("aiGoBtn").style.display = "inline-flex";
+  $("aiStopBtn").style.display = "none";
+  $("aiProgressWrap").style.display = "none";
+  aiAbortCtrl = null;
+}
+
+function clearAiResults(){
+  aiLastResult = null;
+  $("aiResultCard").style.display = "none";
+  $("aiResultBody").innerHTML = '<div class="empty">暂无分析结果</div>';
+  $("aiLog").textContent = "";
+  $("aiRunStatus").textContent = "";
+}
+
+function priorityClassAi(priority){
+  if(priority === "高") return "badge-high";
+  if(priority === "中") return "badge-mid";
+  return "badge-low";
+}
+
+function issueTypeClass(type){
+  if(type === "未回复") return "badge-high";
+  if(type === "高风险") return "badge-high";
+  if(type === "弱回复") return "badge-mid";
+  return "badge-low";
+}
+
+function renderAiResults(data){
+  if(!data) return;
+
+  $("aiResultCard").style.display = "";
+
+  let html = "";
+
+  // Summary section
+  if(data.summary){
+    html += `<div class="summary-box" style="margin-bottom:14px"><b>📋 分析总结</b><div class="knowledge-line">${escapeHtml(data.summary)}</div></div>`;
+  }
+
+  // Recommendations
+  if(data.recommendations && data.recommendations.length){
+    html += '<div class="summary-box" style="margin-bottom:14px"><b>💡 优化建议</b><ul>';
+    data.recommendations.forEach(rec => {
+      html += `<li>${escapeHtml(rec)}</li>`;
+    });
+    html += '</ul></div>';
+  }
+
+  // Classifications table
+  if(data.classifications && data.classifications.length){
+    html += '<div class="section-title">智能分类结果</div>';
+    html += '<table class="ai-result-table"><tr><th>优先级</th><th>问题类型</th><th>话题</th><th>标准问法</th><th>根本原因</th><th>建议动作</th><th>次数</th></tr>';
+    data.classifications.forEach(c => {
+      html += `<tr>
+        <td><span class="badge ${priorityClassAi(c.priority)}">${escapeHtml(c.priority)}</span></td>
+        <td><span class="badge ${issueTypeClass(c.issueType)}">${escapeHtml(c.issueType)}</span></td>
+        <td>${escapeHtml(c.topic || "-")}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(c.standardQuestion || "")}">${escapeHtml(c.standardQuestion || "-")}</td>
+        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(c.rootCause || "")}">${escapeHtml(c.rootCause || "-")}</td>
+        <td>${escapeHtml(c.suggestedAction || "-")}</td>
+        <td>${c.count || 0}</td>
+      </tr>`;
+    });
+    html += '</table>';
+  }
+
+  // Knowledge cards
+  if(data.knowledgeCards && data.knowledgeCards.length){
+    html += '<div class="section-title" style="margin-top:18px">AI 生成知识卡片</div>';
+    html += '<div class="knowledge-grid">';
+    data.knowledgeCards.forEach(card => {
+      html += '<div class="knowledge-card">';
+      html += `<div class="knowledge-title">${escapeHtml(card.title || card.standardQuestion?.substring(0, 20) || "知识卡片")}</div>`;
+      html += `<div class="knowledge-line"><b>标准问：</b>${escapeHtml(card.standardQuestion || "-")}</div>`;
+      if(card.similarQuestions && card.similarQuestions.length){
+        html += `<div class="knowledge-line"><b>相似问：</b>${card.similarQuestions.map(q => `<span class="kw">${escapeHtml(q)}</span>`).join("")}</div>`;
+      }
+      if(card.triggerWords && card.triggerWords.length){
+        html += `<div class="knowledge-line"><b>触发词：</b>${card.triggerWords.map(w => `<span class="kw">${escapeHtml(w)}</span>`).join("")}</div>`;
+      }
+      html += `<div class="knowledge-line"><b>标准答案：</b>${escapeHtml(card.standardAnswer || "-")}</div>`;
+      html += `<div class="knowledge-line"><b>转人工：</b>${escapeHtml(card.manualHandoffRule || "-")}</div>`;
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  if(!data.classifications?.length && !data.knowledgeCards?.length){
+    html = '<div class="empty">AI 未返回有效结果，请检查 API 配置</div>';
+  }
+
+  $("aiResultBody").innerHTML = html;
+}
+
+function exportAiResults(){
+  if(!aiLastResult) return;
+  const d = aiLastResult;
+  const rows = [];
+
+  if(d.classifications){
+    rows.push(["优先级", "问题类型", "话题", "标准问法", "根本原因", "建议动作", "次数"]);
+    d.classifications.forEach(c => {
+      rows.push([c.priority, c.issueType, c.topic, c.standardQuestion, c.rootCause, c.suggestedAction, c.count]);
+    });
+  }
+
+  if(d.knowledgeCards){
+    rows.push([]);
+    rows.push(["=== 知识卡片 ===", "", "", "", "", "", ""]);
+    d.knowledgeCards.forEach(card => {
+      rows.push([
+        card.title, card.standardQuestion,
+        (card.similarQuestions || []).join("；"),
+        (card.triggerWords || []).join("；"),
+        card.standardAnswer,
+        card.manualHandoffRule,
+        ""
+      ]);
+    });
+  }
+
+  if(!rows.length) return;
+
+  // Build CSV
+  const csvContent = rows.map(r => r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csvContent], {type: "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ai-analysis-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 init();

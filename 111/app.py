@@ -32,6 +32,19 @@ USERS_FILE = os.path.join(DATA_DIR, ".users.json")
 ACCESS_PASSWORD = os.environ.get("QA_ACCESS_PASSWORD", "")
 ADMIN_USERNAME = os.environ.get("QA_ADMIN_USERNAME", "shuxing666")
 ADMIN_PASSWORD = os.environ.get("QA_ADMIN_PASSWORD", ACCESS_PASSWORD or "asdfghjkl")
+AI_CONFIG_FILE = os.path.join(DATA_DIR, ".ai_config.json")
+
+DEFAULT_AI_CONFIG = {
+    "providers": {
+        "agnes": {"enabled": False, "apiKey": "", "baseUrl": "https://agent.tanyuai.com/api/v1", "model": "agnes-4"},
+        "openai": {"enabled": False, "apiKey": "", "baseUrl": "https://api.openai.com/v1", "model": "gpt-4o"},
+        "anthropic": {"enabled": False, "apiKey": "", "baseUrl": "https://api.anthropic.com/v1", "model": "claude-sonnet-4-20250514"},
+        "custom": {"enabled": False, "apiKey": "", "baseUrl": "", "model": ""},
+    },
+    "activeProvider": "agnes",
+    "temperature": 0.3,
+    "maxTokens": 4096,
+}
 
 TRACE_API = "https://agent.tanyuai.com/api/im/agent-trace/paginateV2"
 REFERER = "https://agent.tanyuai.com/v2/diagnostic-optimization/optimization-workshop"
@@ -1629,6 +1642,310 @@ def overview():
 @app.errorhandler(Exception)
 def handle_error(e):
     return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============================================================
+# AI Analysis module
+# ============================================================
+
+def load_ai_config():
+    cfg = load_json(AI_CONFIG_FILE, {})
+    # Merge with defaults to ensure all provider keys exist
+    for key, val in DEFAULT_AI_CONFIG.items():
+        if key not in cfg:
+            cfg[key] = val
+    return cfg
+
+
+def save_ai_config(config):
+    save_json(AI_CONFIG_FILE, config)
+
+
+def _mask_api_key(key):
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return "***"
+    return key[:4] + "***" + key[-4:]
+
+
+def _resolve_provider(cfg):
+    """Resolve the active provider config from the full config dict."""
+    active = cfg.get("activeProvider", "agnes")
+    providers = cfg.get("providers", {})
+    provider = providers.get(active, providers.get("agnes", {}))
+    return provider
+
+
+def _call_llm(system_prompt, user_text, cfg):
+    """Call the configured LLM provider via OpenAI-compatible API."""
+    provider = _resolve_provider(cfg)
+    api_key = provider.get("apiKey", "").strip()
+    base_url = provider.get("baseUrl", "").strip()
+    model = provider.get("model", "").strip()
+    temperature = float(cfg.get("temperature", 0.3))
+    max_tokens = int(cfg.get("maxTokens", 4096))
+
+    if not api_key or not base_url or not model:
+        return None, "未配置 API Key 或 Base URL"
+
+    # Determine the endpoint
+    if "anthropic" in base_url or "anthropic" in api_key:
+        # Anthropic format
+        url = base_url.rstrip("/") + "/messages"
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        }
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_text}],
+            "temperature": temperature,
+        }
+    else:
+        # OpenAI-compatible (default)
+        url = base_url.rstrip("/") + "/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if "anthropic" in base_url or "anthropic" in api_key:
+            # Anthropic response format
+            content = data.get("content", [])
+            if isinstance(content, list) and content:
+                text = content[0].get("text", "")
+            else:
+                text = str(data)
+        else:
+            # OpenAI response format
+            choices = data.get("choices", [])
+            if choices:
+                text = choices[0].get("message", {}).get("content", "")
+            else:
+                text = str(data)
+
+        return text, None
+    except requests.exceptions.RequestException as e:
+        return None, str(e)
+    except (ValueError, KeyError) as e:
+        return None, f"解析响应失败: {e}"
+
+
+@app.route("/api/ai/config")
+@require_auth
+def ai_config_get():
+    cfg = load_ai_config()
+    # Mask API keys
+    providers_out = {}
+    for name, prov in cfg.get("providers", {}).items():
+        providers_out[name] = {
+            "enabled": prov.get("enabled", False),
+            "apiKey": _mask_api_key(prov.get("apiKey", "")),
+            "baseUrl": prov.get("baseUrl", ""),
+            "model": prov.get("model", ""),
+        }
+    return jsonify({
+        "success": True,
+        "config": {
+            "providers": providers_out,
+            "activeProvider": cfg.get("activeProvider", "agnes"),
+            "temperature": cfg.get("temperature", 0.3),
+            "maxTokens": cfg.get("maxTokens", 4096),
+        },
+    })
+
+
+@app.route("/api/ai/config", methods=["POST"])
+@require_auth
+def ai_config_save():
+    data = request.get_json() or {}
+    cfg = load_ai_config()
+
+    # Update active provider
+    if "activeProvider" in data:
+        cfg["activeProvider"] = str(data["activeProvider"]).strip()
+
+    # Update temperature / max tokens
+    if "temperature" in data:
+        try:
+            cfg["temperature"] = float(data["temperature"])
+        except (ValueError, TypeError):
+            pass
+    if "maxTokens" in data:
+        try:
+            cfg["maxTokens"] = int(data["maxTokens"])
+        except (ValueError, TypeError):
+            pass
+
+    # Update provider configs
+    prov = _resolve_provider(cfg)
+    for key in ("apiKey", "baseUrl", "model"):
+        if key in data:
+            val = str(data[key]).strip()
+            if val:
+                prov[key] = val
+            elif key == "apiKey":
+                # Empty API key means user didn't change it — keep existing
+                pass
+            else:
+                # Empty baseUrl or model — still update (user wants to clear)
+                prov[key] = val
+
+    # Update provider enable/disable
+    if "providerEnabled" in data:
+        enabled = data["providerEnabled"]
+        if isinstance(enabled, dict):
+            for pname, state in enabled.items():
+                if pname in cfg.get("providers", {}):
+                    cfg["providers"][pname]["enabled"] = bool(state)
+
+    save_ai_config(cfg)
+    return jsonify({"success": True})
+
+
+@app.route("/api/ai/test", methods=["POST"])
+@require_auth
+def ai_test():
+    cfg = load_ai_config()
+    text, err = _call_llm(
+        "Reply in one word: OK",
+        "Say hello.",
+        cfg,
+    )
+    if err:
+        return jsonify({"success": False, "error": err})
+    return jsonify({"success": True, "response": text[:200]})
+
+
+@app.route("/api/ai/analyze", methods=["POST"])
+@require_auth
+def ai_analyze():
+    data = request.get_json() or {}
+    shop_id = str(data.get("shopId", "")).strip()
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"})
+
+    traces = load_json(data_file(shop_id), [])
+    if not traces:
+        return jsonify({"success": False, "error": "没有可分析的数据，请先抓取数据"})
+
+    cfg = load_ai_config()
+    provider = _resolve_provider(cfg)
+    if not provider.get("apiKey") or not provider.get("baseUrl") or not provider.get("model"):
+        return jsonify({"success": False, "error": "请先在 API 配置中设置模型参数"})
+
+    # Sample traces (max 500 to avoid token limits)
+    sampled = traces[:500]
+
+    # Build system prompt
+    system_prompt = """你是一个电商智能体质检专家。你的任务是分析智能体与买家的对话记录，找出问题并给出优化建议。
+
+请按以下 JSON 格式返回结果（不要返回其他内容）：
+{
+  "summary": "整体分析总结（100字以内）",
+  "recommendations": ["建议1", "建议2", "建议3"],
+  "classifications": [
+    {
+      "issueType": "未回复|弱回复|高风险|正常",
+      "priority": "高|中|低",
+      "topic": "问题分类",
+      "standardQuestion": "标准问法",
+      "rootCause": "根本原因",
+      "suggestedAction": "建议动作",
+      "count": 出现次数
+    }
+  ],
+  "knowledgeCards": [
+    {
+      "title": "卡片标题",
+      "standardQuestion": "标准问法",
+      "similarQuestions": ["相似问法1", "相似问法2"],
+      "triggerWords": ["触发词1", "触发词2"],
+      "standardAnswer": "标准答案",
+      "manualHandoffRule": "转人工规则"
+    }
+  ]
+}
+
+注意事项：
+1. classifications 最多返回 10 条，按优先级排序
+2. knowledgeCards 最多返回 6 张，只针对有问题（非正常）的对话生成
+3. 所有字段都是中文
+4. standardAnswer 要具体可执行，包含操作步骤和时效承诺
+5. manualHandoffRule 要明确什么情况下必须转人工"""
+
+    # Build user prompt with trace samples
+    trace_samples = []
+    for i, record in enumerate(sampled[:50]):  # Use first 50 for context
+        if not isinstance(record, dict):
+            continue
+        question = record.get("question", "") or record.get("searchContent", "") or ""
+        answer = record.get("content", "") or ""
+        if isinstance(answer, list):
+            answer = "\n".join(str(c) for c in answer if isinstance(c, str))
+        topic = record.get("topicName", "") or ""
+        buyer = record.get("buyerAccount", "") or ""
+        product = ""
+        pi = record.get("productInfo", {})
+        if isinstance(pi, dict):
+            product = pi.get("spuTitle", "") or pi.get("title", "") or ""
+        trace_samples.append({
+            "index": i + 1,
+            "question": str(question)[:200],
+            "answer": str(answer)[:300],
+            "topic": str(topic)[:50],
+            "buyer": str(buyer)[:30],
+            "product": str(product)[:50],
+        })
+
+    user_text = f"""请分析以下 {len(trace_samples)} 条智能体对话记录：
+
+{json.dumps(trace_samples, ensure_ascii=False, indent=2)}
+
+请按照要求返回结构化分析结果。"""
+
+    llm_text, err = _call_llm(system_prompt, user_text, cfg)
+    if err:
+        return jsonify({"success": False, "error": f"LLM 调用失败: {err}"})
+
+    # Parse JSON from LLM response
+    try:
+        # Try to extract JSON from the response (handle markdown code blocks)
+        cleaned = llm_text.strip()
+        if cleaned.startswith("```"):
+            # Remove markdown code fences
+            lines = cleaned.split("\n")
+            cleaned = "\n".join(lines[1:])
+            if cleaned.startswith("```"):
+                cleaned = cleaned[1:]
+            lines = cleaned.split("\n")
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned = "\n".join(lines)
+
+        result = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        return jsonify({"success": False, "error": f"AI 返回格式解析失败: {e}\n原始内容: {llm_text[:500]}"})
+
+    return jsonify({"success": True, "data": result})
 
 
 if __name__ == "__main__":
