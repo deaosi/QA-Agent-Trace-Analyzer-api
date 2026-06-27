@@ -14,7 +14,7 @@
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif;font-size:13px}
 .topbar{height:60px;background:#101828;color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #1f2937;box-shadow:0 8px 24px rgba(16,24,40,.16);gap:18px}
 .brand{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:760}.brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1677ff,#4f46e5);display:grid;place-items:center;font-weight:800;box-shadow:0 8px 18px rgba(22,119,255,.32)}
-.top-meta{color:#cbd5e1;font-size:12px}.top-actions{display:flex;align-items:center;gap:14px;margin-left:auto}.account-menu{position:relative}.settings-btn{width:34px;height:34px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-size:17px;line-height:1;display:grid;place-items:center;cursor:pointer}.settings-btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.32)}.settings-menu{display:none;position:absolute;right:0;top:42px;width:190px;background:#fff;color:#172033;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-lg);z-index:30;overflow:hidden}.settings-menu.open{display:block}.settings-user{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:750;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.settings-menu a{display:block;padding:10px 12px;color:#344054;text-decoration:none;font-weight:650}.settings-menu a:hover{background:#f8fafc;color:#0958d9}.page{max-width:1320px;margin:0 auto;padding:18px 20px 28px}
+.top-meta{color:#cbd5e1;font-size:12px}.top-actions{display:flex;align-items:center;gap:14px;margin-left:auto}.account-menu{position:relative}.settings-btn{width:34px;height:34px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-size:17px;line-height:1;display:grid;place-items:center;cursor:pointer}.settings-btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.32)}.settings-menu{display:none;position:absolute;right:0;top:42px;width:190px;background:#fff;color:#172033;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-lg);z-index:30;overflow:hidden}.settings-menu.open{display:block}.settings-user{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:750;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.settings-menu a{display:block;padding:10px 12px;color:#344054;text-decoration:none;font-weight:650}.settings-menu a:hover{background:#f8fafc;color:#0958d9}.page{max-width:1400px;margin:0 auto;padding:18px 24px 28px}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}.metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#1677ff}.metric:nth-child(3)::before{background:#039855}.metric:nth-child(4)::before{background:#4f46e5}
 .metric-value{font-size:27px;line-height:1;font-weight:780;color:#0f172a}.metric-label{font-size:12px;color:var(--muted);margin-top:8px}.metric:nth-child(2) .metric-value{color:#1677ff}.metric:nth-child(3) .metric-value{color:#039855}
 .layout{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}.stack{display:flex;flex-direction:column;gap:14px}
@@ -56,10 +56,10 @@ td{overflow-wrap:break-word;word-break:break-all}
 .qa-panel{margin-top:18px}.qa-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.qa-count{font-size:12px;color:var(--muted);font-weight:500}.qa-topic{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f2f4f7;color:#344054;font-size:12px;font-weight:650}.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}.pager-total{color:#475467;font-size:12px;margin-right:auto}.pager-pages{display:grid;grid-template-columns:repeat(7,32px);gap:4px}.page-btn{height:30px;min-width:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:#344054;font-weight:650;cursor:pointer}.page-btn:hover{border-color:var(--primary);color:var(--primary)}.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}.page-btn:disabled{cursor:not-allowed;opacity:.45;border-color:var(--line);color:var(--muted)}.page-ellipsis{height:30px;display:grid;place-items:center;color:var(--muted);font-weight:700}.pager-jump{display:flex;align-items:center;gap:6px;color:#475467;font-size:12px}.pager-jump input{width:48px;height:30px;text-align:center}.pager-size{height:30px;width:auto;min-width:92px}
 .cookie-output{min-height:92px}.muted-line{color:var(--muted);font-size:12px;margin-top:6px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
 /* Tab navigation */
-.tab-nav{display:flex;gap:4px;margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:var(--shadow)}.tab-btn{flex:1;height:36px;border:none;border-radius:8px;background:transparent;color:#475467;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s}.tab-btn:hover{background:#f8fafc;color:var(--primary)}.tab-btn.active{background:var(--primary);color:#fff}.tab-btn[data-tab="ai"].active{background:var(--indigo)}.tab-btn[data-tab="ai"]:hover{background:#f2f0ff;color:var(--indigo)}.tab-panel{display:none}.tab-panel.active{display:block}
+.tab-nav{display:flex;gap:4px;margin-bottom:16px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:var(--shadow)}.tab-btn{flex:1;height:38px;border:none;border-radius:8px;background:transparent;color:#475467;font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}.tab-btn:hover{background:#f8fafc;color:var(--primary)}.tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(22,119,255,.25)}.tab-btn[data-tab="ai"].active{background:var(--indigo);box-shadow:0 2px 8px rgba(79,70,229,.25)}.tab-btn[data-tab="ai"]:hover{background:#f2f0ff;color:var(--indigo)}.tab-panel{display:none}.tab-panel.active{display:block}
 /* AI config form */
-.ai-provider-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.ai-provider-btn{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:700;transition:all .15s}.ai-provider-btn:hover{border-color:var(--primary);color:var(--primary)}.ai-provider-btn.active{border-color:var(--primary);background:#eef4ff;color:var(--primary)}.ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ai-form-grid .field{min-width:0}
-@media(max-width:600px){.ai-provider-grid{grid-template-columns:1fr}.ai-form-grid{grid-template-columns:1fr}}
+.ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ai-form-grid .field{min-width:0}.ai-form-grid .field.full{grid-column:1/-1}
+@media(max-width:600px){.ai-form-grid{grid-template-columns:1fr}}
 @media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}.brand span{font-size:15px}.settings-menu{right:-2px}}
 </style>
 </head>
@@ -82,7 +82,7 @@ td{overflow-wrap:break-word;word-break:break-all}
   <!-- Tab Navigation -->
   <nav class="tab-nav" style="margin-bottom:16px">
     <button class="tab-btn active" data-tab="local" onclick="switchTab('local')" style="font-size:14px;height:40px">📊 本地分析</button>
-    <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')" style="font-size:14px;height:40px">🤖 AI 分析</button>
+    <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')" style="font-size:14px;height:40px">🤖 AI 深度分析</button>
   </nav>
 
   <section class="metrics">
@@ -95,9 +95,6 @@ td{overflow-wrap:break-word;word-break:break-all}
   <!-- Local Analysis Panel (existing) -->
   <div class="tab-panel active" id="panel-local">
   <section class="layout">
-    <div style="text-align:right;padding:4px 0 8px 0">
-      <button class="btn btn-primary" onclick="switchTab('ai')" style="height:30px;font-size:12px">🤖 切换到 AI 分析</button>
-    </div>
     <aside class="stack">
       <section class="card">
         <div class="card-header"><span>Cookie 拼接助手</span><span id="shopStatus" class="pill">未检测</span></div>
@@ -225,23 +222,14 @@ td{overflow-wrap:break-word;word-break:break-all}
 
   <!-- AI Analysis Panel -->
   <div class="tab-panel" id="panel-ai">
-    <div style="text-align:right;padding:4px 0 8px 0">
-      <button class="btn" onclick="switchTab('local')" style="height:30px;font-size:12px">📊 切换回本地分析</button>
-    </div>
     <section class="stack">
       <!-- AI Config Card -->
       <section class="card">
         <div class="card-header"><span>🔧 API 配置</span><span class="pill" id="aiConfigStatus">未配置</span></div>
         <div class="card-body">
-          <div class="section-title">选择提供商</div>
-          <div class="ai-provider-grid">
-            <div class="ai-provider-btn active" data-provider="agnes" onclick="selectProvider('agnes')">Agnes AI</div>
-            <div class="ai-provider-btn" data-provider="openai" onclick="selectProvider('openai')">OpenAI</div>
-            <div class="ai-provider-btn" data-provider="anthropic" onclick="selectProvider('anthropic')">Anthropic</div>
-          </div>
-          <div class="ai-provider-grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
-            <div class="field"><label>Base URL</label><input id="aiBaseUrl" placeholder="https://api.xxx.com/v1" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
-            <div class="field"><label>Model</label><input id="aiModel" placeholder="agnes-4" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+          <div class="ai-form-grid">
+            <div class="field full"><label>Base URL</label><input id="aiBaseUrl" placeholder="https://api.xxx.com/v1" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+            <div class="field"><label>Model</label><input id="aiModel" placeholder="例如 gpt-4o, claude-sonnet-4-20250514" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
             <div class="field"><label>API Key</label><input id="aiApiKey" type="password" placeholder="sk-..." onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
           </div>
           <div class="ai-form-grid" style="margin-top:10px">
@@ -1357,7 +1345,6 @@ function jumpChatPage(){
 
 let aiAbortCtrl = null;
 let aiLastResult = null;
-let currentAiProvider = "agnes";
 
 async function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -1377,32 +1364,18 @@ async function loadAiConfig(){
     const r = await get("/api/ai/config");
     if(!r.success) return;
     const cfg = r.config;
-    const prov = cfg.providers[cfg.activeProvider] || cfg.providers.agnes;
-    currentAiProvider = cfg.activeProvider;
 
-    $("aiBaseUrl").value = prov.baseUrl || "";
-    $("aiModel").value = prov.model || "";
-    $("aiApiKey").value = prov.apiKey ? "" : prov.apiKey; // blank if masked
-    $("aiApiKey").placeholder = prov.apiKey ? "已配置" : "sk-...";
+    $("aiBaseUrl").value = cfg.baseUrl || "";
+    $("aiModel").value = cfg.model || "";
+    $("aiApiKey").value = ""; // always blank for security
+    $("aiApiKey").placeholder = cfg.apiKeyMasked ? "已配置" : "sk-...";
     $("aiTemperature").value = cfg.temperature || 0.3;
     $("aiMaxTokens").value = cfg.maxTokens || 4096;
 
-    // Update provider buttons
-    document.querySelectorAll(".ai-provider-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.provider === cfg.activeProvider);
-    });
-
-    $("aiConfigStatus").textContent = prov.apiKey ? "已配置" : "未配置";
+    $("aiConfigStatus").textContent = cfg.apiKeyMasked ? "已配置" : "未配置";
   } catch(e) {
     console.error("loadAiConfig error:", e);
   }
-}
-
-function selectProvider(name){
-  currentAiProvider = name;
-  document.querySelectorAll(".ai-provider-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.provider === name);
-  });
 }
 
 async function saveAiConfig(){
@@ -1418,7 +1391,6 @@ async function saveAiConfig(){
   }
 
   const payload = {
-    activeProvider: currentAiProvider,
     baseUrl: baseUrl,
     model: model,
     temperature: temperature,
@@ -1431,6 +1403,7 @@ async function saveAiConfig(){
 
   if(r.success){
     $("aiConfigStatus").textContent = "已保存";
+    $("aiApiKey").placeholder = "已配置";
     alert("配置已保存");
   } else {
     alert("保存失败: " + (r.error || "未知错误"));
@@ -1448,8 +1421,17 @@ async function testAiConnection(){
       resultEl.textContent = "✓ 连接成功: " + (r.response || "OK");
       resultEl.style.color = "var(--success)";
     } else {
-      resultEl.textContent = "✗ 连接失败: " + (r.error || "未知错误");
+      const err = r.error || "未知错误";
+      resultEl.textContent = "✗ 连接失败: " + err;
       resultEl.style.color = "var(--danger)";
+      // Provide helpful hints for common errors
+      if(err.includes("Failed to resolve") || err.includes("getaddrinfo") || err.includes("ENOTFOUND")){
+        resultEl.textContent += "（可能是 DNS 解析问题，请检查 Base URL 是否正确）";
+      } else if(err.includes("certificate") || err.includes("SSL")){
+        resultEl.textContent += "（可能是 SSL 证书问题，请确认 Base URL 使用 HTTPS）";
+      } else if(err.includes("timed out") || err.includes("Timeout")){
+        resultEl.textContent += "（连接超时，请检查网络和 Base URL）";
+      }
     }
   } catch(e){
     resultEl.textContent = "✗ 网络错误: " + e.message;

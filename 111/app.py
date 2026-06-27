@@ -35,13 +35,9 @@ ADMIN_PASSWORD = os.environ.get("QA_ADMIN_PASSWORD", ACCESS_PASSWORD or "asdfghj
 AI_CONFIG_FILE = os.path.join(DATA_DIR, ".ai_config.json")
 
 DEFAULT_AI_CONFIG = {
-    "providers": {
-        "agnes": {"enabled": False, "apiKey": "", "baseUrl": "https://agent.tanyuai.com/api/v1", "model": "agnes-4"},
-        "openai": {"enabled": False, "apiKey": "", "baseUrl": "https://api.openai.com/v1", "model": "gpt-4o"},
-        "anthropic": {"enabled": False, "apiKey": "", "baseUrl": "https://api.anthropic.com/v1", "model": "claude-sonnet-4-20250514"},
-        "custom": {"enabled": False, "apiKey": "", "baseUrl": "", "model": ""},
-    },
-    "activeProvider": "agnes",
+    "baseUrl": "https://api.xxx.com/v1",
+    "model": "",
+    "apiKey": "",
     "temperature": 0.3,
     "maxTokens": 4096,
 }
@@ -1650,7 +1646,20 @@ def handle_error(e):
 
 def load_ai_config():
     cfg = load_json(AI_CONFIG_FILE, {})
-    # Merge with defaults to ensure all provider keys exist
+    # Backward compatibility: migrate old provider-based config to flat config
+    if "providers" in cfg and "activeProvider" in cfg:
+        providers = cfg.get("providers", {})
+        active = cfg.get("activeProvider", "agnes")
+        provider = providers.get(active, providers.get("agnes", {}))
+        cfg = {
+            "baseUrl": provider.get("baseUrl", ""),
+            "model": provider.get("model", ""),
+            "apiKey": provider.get("apiKey", ""),
+            "temperature": cfg.get("temperature", 0.3),
+            "maxTokens": cfg.get("maxTokens", 4096),
+        }
+        save_ai_config(cfg)
+    # Merge with defaults for any missing keys
     for key, val in DEFAULT_AI_CONFIG.items():
         if key not in cfg:
             cfg[key] = val
@@ -1669,29 +1678,33 @@ def _mask_api_key(key):
     return key[:4] + "***" + key[-4:]
 
 
-def _resolve_provider(cfg):
-    """Resolve the active provider config from the full config dict."""
-    active = cfg.get("activeProvider", "agnes")
-    providers = cfg.get("providers", {})
-    provider = providers.get(active, providers.get("agnes", {}))
-    return provider
+def _resolve_config(cfg):
+    """Return a flat dict with the current AI config values."""
+    return {
+        "apiKey": cfg.get("apiKey", "").strip(),
+        "baseUrl": cfg.get("baseUrl", "").strip(),
+        "model": cfg.get("model", "").strip(),
+        "temperature": float(cfg.get("temperature", 0.3)),
+        "maxTokens": int(cfg.get("maxTokens", 4096)),
+    }
 
 
 def _call_llm(system_prompt, user_text, cfg):
     """Call the configured LLM provider via OpenAI-compatible API."""
-    provider = _resolve_provider(cfg)
-    api_key = provider.get("apiKey", "").strip()
-    base_url = provider.get("baseUrl", "").strip()
-    model = provider.get("model", "").strip()
-    temperature = float(cfg.get("temperature", 0.3))
-    max_tokens = int(cfg.get("maxTokens", 4096))
+    p = _resolve_config(cfg)
+    api_key = p["apiKey"]
+    base_url = p["baseUrl"]
+    model = p["model"]
+    temperature = p["temperature"]
+    max_tokens = p["maxTokens"]
 
     if not api_key or not base_url or not model:
-        return None, "未配置 API Key 或 Base URL"
+        return None, "未配置 API Key、Base URL 或 Model"
 
-    # Determine the endpoint
-    if "anthropic" in base_url or "anthropic" in api_key:
-        # Anthropic format
+    # Detect Anthropic vs OpenAI-compatible API format
+    is_anthropic = "anthropic" in base_url.lower() or "anthropic" in api_key.lower()
+
+    if is_anthropic:
         url = base_url.rstrip("/") + "/messages"
         headers = {
             "Content-Type": "application/json",
@@ -1727,15 +1740,13 @@ def _call_llm(system_prompt, user_text, cfg):
         resp.raise_for_status()
         data = resp.json()
 
-        if "anthropic" in base_url or "anthropic" in api_key:
-            # Anthropic response format
+        if is_anthropic:
             content = data.get("content", [])
             if isinstance(content, list) and content:
                 text = content[0].get("text", "")
             else:
                 text = str(data)
         else:
-            # OpenAI response format
             choices = data.get("choices", [])
             if choices:
                 text = choices[0].get("message", {}).get("content", "")
@@ -1753,20 +1764,14 @@ def _call_llm(system_prompt, user_text, cfg):
 @require_auth
 def ai_config_get():
     cfg = load_ai_config()
-    # Mask API keys
-    providers_out = {}
-    for name, prov in cfg.get("providers", {}).items():
-        providers_out[name] = {
-            "enabled": prov.get("enabled", False),
-            "apiKey": _mask_api_key(prov.get("apiKey", "")),
-            "baseUrl": prov.get("baseUrl", ""),
-            "model": prov.get("model", ""),
-        }
+    masked_key = _mask_api_key(cfg.get("apiKey", ""))
     return jsonify({
         "success": True,
         "config": {
-            "providers": providers_out,
-            "activeProvider": cfg.get("activeProvider", "agnes"),
+            "baseUrl": cfg.get("baseUrl", ""),
+            "model": cfg.get("model", ""),
+            "apiKey": masked_key,
+            "apiKeyMasked": bool(masked_key),
             "temperature": cfg.get("temperature", 0.3),
             "maxTokens": cfg.get("maxTokens", 4096),
         },
@@ -1778,10 +1783,6 @@ def ai_config_get():
 def ai_config_save():
     data = request.get_json() or {}
     cfg = load_ai_config()
-
-    # Update active provider
-    if "activeProvider" in data:
-        cfg["activeProvider"] = str(data["activeProvider"]).strip()
 
     # Update temperature / max tokens
     if "temperature" in data:
@@ -1795,27 +1796,15 @@ def ai_config_save():
         except (ValueError, TypeError):
             pass
 
-    # Update provider configs
-    prov = _resolve_provider(cfg)
-    for key in ("apiKey", "baseUrl", "model"):
+    # Update baseUrl / model
+    for key in ("baseUrl", "model"):
         if key in data:
             val = str(data[key]).strip()
-            if val:
-                prov[key] = val
-            elif key == "apiKey":
-                # Empty API key means user didn't change it — keep existing
-                pass
-            else:
-                # Empty baseUrl or model — still update (user wants to clear)
-                prov[key] = val
+            cfg[key] = val
 
-    # Update provider enable/disable
-    if "providerEnabled" in data:
-        enabled = data["providerEnabled"]
-        if isinstance(enabled, dict):
-            for pname, state in enabled.items():
-                if pname in cfg.get("providers", {}):
-                    cfg["providers"][pname]["enabled"] = bool(state)
+    # Only update apiKey if user actually typed something
+    if "apiKey" in data and data["apiKey"]:
+        cfg["apiKey"] = str(data["apiKey"]).strip()
 
     save_ai_config(cfg)
     return jsonify({"success": True})
@@ -1848,8 +1837,8 @@ def ai_analyze():
         return jsonify({"success": False, "error": "没有可分析的数据，请先抓取数据"})
 
     cfg = load_ai_config()
-    provider = _resolve_provider(cfg)
-    if not provider.get("apiKey") or not provider.get("baseUrl") or not provider.get("model"):
+    p = _resolve_config(cfg)
+    if not p["apiKey"] or not p["baseUrl"] or not p["model"]:
         return jsonify({"success": False, "error": "请先在 API 配置中设置模型参数"})
 
     # Sample traces (max 500 to avoid token limits)
@@ -1922,9 +1911,21 @@ def ai_analyze():
 
 请按照要求返回结构化分析结果。"""
 
-    llm_text, err = _call_llm(system_prompt, user_text, cfg)
+    # Retry logic: up to 2 retries on transient network errors
+    last_err = None
+    for attempt in range(1, 4):
+        llm_text, err = _call_llm(system_prompt, user_text, cfg)
+        if err:
+            last_err = err
+            if attempt < 3:
+                time.sleep(2 ** (attempt - 1))  # exponential backoff: 2s, 4s
+                continue
+            break
+        # Success
+        break
+
     if err:
-        return jsonify({"success": False, "error": f"LLM 调用失败: {err}"})
+        return jsonify({"success": False, "error": f"LLM 调用失败 (尝试{attempt}次): {err}"})
 
     # Parse JSON from LLM response
     try:
