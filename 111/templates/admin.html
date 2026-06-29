@@ -2,44 +2,166 @@
 {% block title %}账号后台管理{% endblock %}
 {% block body %}
 <div class="admin">
-<div class="panel">
-<div class="panel-head"><h1>账号后台管理</h1><div><a class="link" href="/">返回工作台</a> | <a class="link" href="/logout">退出</a></div></div>
-<div class="panel-body">
-<div class="grid">
-<input id="newUsername" placeholder="新账号">
-<input id="newPassword" type="password" placeholder="初始密码" autocomplete="new-password">
-<select id="newRole">
-<option value="user">普通账号</option>
-<option value="admin">管理员</option>
-</select>
-<button onclick="createUser()">新增账号</button>
-</div>
-<table>
-<thead>
-<tr>
-<th>账号</th>
-<th>角色</th>
-<th>状态</th>
-<th>到期时间</th>
-<th>最近登录</th>
-<th>操作</th>
-</tr>
-</thead>
-<tbody id="userRows"></tbody>
-</table>
-<div id="msg" class="muted" style="margin-top:12px"></div>
-</div>
-</div>
+  <div class="panel">
+    <div class="panel-head">
+      <h1>账号后台管理</h1>
+      <div><a class="link" href="/">返回工作台</a> | <a class="link" href="/logout">退出</a></div>
+    </div>
+    <div class="panel-body">
+      <div class="grid">
+        <input id="newUsername" placeholder="新账号">
+        <input id="newPassword" type="password" placeholder="初始密码" autocomplete="new-password">
+        <input id="newRemark" placeholder="备注">
+        <select id="newRole">
+          <option value="user">普通账号</option>
+          <option value="admin">管理员</option>
+        </select>
+        <button onclick="createUser()">新增账号</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>账号</th>
+            <th>角色</th>
+            <th>状态</th>
+            <th>备注</th>
+            <th>密码</th>
+            <th>到期时间</th>
+            <th>最近登录</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="userRows"></tbody>
+      </table>
+      <div id="msg" class="muted" style="margin-top:12px"></div>
+    </div>
+  </div>
 </div>
 <script>
-const $=id=>document.getElementById(id);const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-async function api(url,data){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data||{})});return r.json()}
-async function load(){const r=await fetch("/api/admin/users");const d=await r.json();$("userRows").innerHTML=(d.users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td>${u.role==="admin"?"管理员":"普通用户"}</td><td>${u.active?"启用":"禁用"}</td><td>${esc(u.expiresAt||"永久")}</td><td>${esc(u.lastLoginAt||"-")}</td><td><div class="actions"><button onclick="resetPwd(this)" data-username="${esc(u.username)}">改密码</button><button onclick="setExpire(this)" data-username="${esc(u.username)}">到期时间</button><button onclick="toggleUser(this)" data-username="${esc(u.username)}" data-active="${u.active}">${u.active?"禁用":"启用"}</button><button class="danger" onclick="delUser(this)" data-username="${esc(u.username)}">删除</button></div></td></tr>`).join("")}
-async function createUser(){const r=await api("/api/admin/users/create",{username:$("newUsername").value,password:$("newPassword").value,role:$("newRole").value});$("msg").textContent=r.success?"已新增":r.error;load()}
-async function resetPwd(btn){const username=btn.dataset.username,password=prompt("输入新密码");if(!password)return;const r=await api("/api/admin/users/update",{username,password});$("msg").textContent=r.success?"密码已修改":r.error;load()}
-async function setExpire(btn){const username=btn.dataset.username,expiresAt=prompt("到期时间，格式 2026-12-31T23:59:59；留空表示永久");if(expiresAt===null)return;const r=await api("/api/admin/users/update",{username,expiresAt});$("msg").textContent=r.success?"到期时间已更新":r.error;load()}
-async function toggleUser(btn){const username=btn.dataset.username,active=btn.dataset.active!=="true";const r=await api("/api/admin/users/update",{username,active});$("msg").textContent=r.success?"状态已更新":r.error;load()}
-async function delUser(btn){const username=btn.dataset.username;if(!confirm("确定删除账号 "+username+"?"))return;const r=await api("/api/admin/users/delete",{username});$("msg").textContent=r.success?"已删除":r.error;load()}
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "\"": "&quot;",
+  "'": "&#39;"
+}[char]));
+
+async function api(url, data) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data || {})
+  });
+  return response.json();
+}
+
+function showMessage(result, successText) {
+  $("msg").textContent = result.success ? successText : (result.error || "操作失败");
+}
+
+function passwordText(user) {
+  return user.hasPassword ? "已设置" : "未设置";
+}
+
+function actionButtons(user) {
+  const locked = Boolean(user.systemLocked);
+  const disabled = locked ? "disabled title=\"系统默认管理员不可由其他管理员修改\"" : "";
+  const toggleLabel = user.active ? "禁用" : "启用";
+  return `
+    <div class="actions">
+      <button onclick="editRemark(this)" data-username="${esc(user.username)}" data-remark="${esc(user.remark || "")}" ${disabled}>备注</button>
+      <button onclick="resetPwd(this)" data-username="${esc(user.username)}" ${disabled}>重置密码</button>
+      <button onclick="setExpire(this)" data-username="${esc(user.username)}" ${disabled}>到期时间</button>
+      <button onclick="toggleUser(this)" data-username="${esc(user.username)}" data-active="${user.active}" ${disabled}>${toggleLabel}</button>
+      <button onclick="toggleRole(this)" data-username="${esc(user.username)}" data-role="${esc(user.role)}" ${disabled}>切换角色</button>
+      <button class="danger" onclick="delUser(this)" data-username="${esc(user.username)}" ${disabled}>删除</button>
+    </div>`;
+}
+
+async function load() {
+  const response = await fetch("/api/admin/users");
+  const data = await response.json();
+  $("userRows").innerHTML = (data.users || []).map(user => `
+    <tr>
+      <td>${esc(user.username)}${user.systemLocked ? ' <span class="muted">系统锁定</span>' : ""}</td>
+      <td>${user.role === "admin" ? "管理员" : "普通账号"}</td>
+      <td>${user.active ? "启用" : "禁用"}</td>
+      <td>${esc(user.remark || "-")}</td>
+      <td>${passwordText(user)}</td>
+      <td>${esc(user.expiresAt || "永久")}</td>
+      <td>${esc(user.lastLoginAt || "-")}</td>
+      <td>${actionButtons(user)}</td>
+    </tr>`).join("");
+}
+
+async function createUser() {
+  const result = await api("/api/admin/users/create", {
+    username: $("newUsername").value,
+    password: $("newPassword").value,
+    remark: $("newRemark").value,
+    role: $("newRole").value
+  });
+  showMessage(result, "已新增");
+  if (result.success) {
+    $("newUsername").value = "";
+    $("newPassword").value = "";
+    $("newRemark").value = "";
+  }
+  load();
+}
+
+async function editRemark(button) {
+  const username = button.dataset.username;
+  const remark = prompt("输入备注", button.dataset.remark || "");
+  if (remark === null) return;
+  const result = await api("/api/admin/users/update", {username, remark});
+  showMessage(result, "备注已更新");
+  load();
+}
+
+async function resetPwd(button) {
+  const username = button.dataset.username;
+  const password = prompt("输入新密码");
+  if (!password) return;
+  const result = await api("/api/admin/users/update", {username, password});
+  showMessage(result, "密码已重置");
+  load();
+}
+
+async function setExpire(button) {
+  const username = button.dataset.username;
+  const expiresAt = prompt("到期时间，格式如 2026-12-31T23:59:59；留空表示永久");
+  if (expiresAt === null) return;
+  const result = await api("/api/admin/users/update", {username, expiresAt});
+  showMessage(result, "到期时间已更新");
+  load();
+}
+
+async function toggleUser(button) {
+  const username = button.dataset.username;
+  const active = button.dataset.active !== "true";
+  const result = await api("/api/admin/users/update", {username, active});
+  showMessage(result, "状态已更新");
+  load();
+}
+
+async function toggleRole(button) {
+  const username = button.dataset.username;
+  const role = button.dataset.role === "admin" ? "user" : "admin";
+  const result = await api("/api/admin/users/update", {username, role});
+  showMessage(result, "角色已切换");
+  load();
+}
+
+async function delUser(button) {
+  const username = button.dataset.username;
+  if (!confirm("确认删除账号 " + username + "？")) return;
+  const result = await api("/api/admin/users/delete", {username});
+  showMessage(result, "已删除");
+  load();
+}
+
 load();
 </script>
 {% endblock %}

@@ -1,33 +1,38 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 chcp 65001 >nul
 
 set "PID_FILE=%CD%\server.pid"
-
-if not exist "%PID_FILE%" (
-  echo server.pid not found. Service is probably not running.
-  pause
-  exit /b 0
+set "PORT=5000"
+if exist ".env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+    if /I "%%A"=="QA_PORT" set "PORT=%%B"
+  )
 )
 
-set /p PID=<"%PID_FILE%"
-if "%PID%"=="" (
-  del "%PID_FILE%" >nul 2>nul
-  echo Empty PID file cleaned.
-  pause
-  exit /b 0
+set "STOPPED=0"
+
+if exist "%PID_FILE%" (
+  set /p PID=<"%PID_FILE%"
+  if not "%PID%"=="" (
+    tasklist /FI "PID eq %PID%" | findstr "%PID%" >nul 2>nul
+    if not errorlevel 1 (
+      taskkill /PID %PID% /T /F >nul 2>nul
+      set "STOPPED=1"
+    )
+  )
 )
 
-tasklist /FI "PID eq %PID%" | findstr "%PID%" >nul 2>nul
-if errorlevel 1 (
-  del "%PID_FILE%" >nul 2>nul
-  echo Service is not running. PID file cleaned.
-  pause
-  exit /b 0
+for /f "tokens=5" %%P in ('netstat -ano -p tcp ^| findstr /R /C:":%PORT% .*LISTENING"') do (
+  taskkill /PID %%P /T /F >nul 2>nul
+  set "STOPPED=1"
 )
 
-taskkill /PID %PID% /F >nul
 del "%PID_FILE%" >nul 2>nul
-echo Service stopped.
+if "!STOPPED!"=="1" (
+  echo Service stopped.
+) else (
+  echo Service was not running.
+)
 pause

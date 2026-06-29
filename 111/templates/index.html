@@ -254,7 +254,7 @@ td{overflow-wrap:break-word;word-break:break-all}
               <button class="btn btn-primary" id="aiGoBtn" onclick="runAiAnalysis()">运行 AI 分析</button>
               <button class="btn btn-danger" id="aiStopBtn" style="display:none" onclick="cancelAiAnalysis()">停止</button>
               <label class="status" style="display:inline-flex;align-items:center;gap:6px">每批
-                <select id="aiBatchSize" style="width:82px;height:32px"><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select>
+                <select id="aiBatchSize" style="width:82px;height:32px"><option value="10" selected>10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select>
               </label>
               <button class="btn" onclick="clearAiResults()">清空结果</button>
             </div>
@@ -1273,7 +1273,7 @@ let aiProgressTicker = null;
 let aiProgressStartedAt = 0;
 let aiVisualPct = 0;
 let aiProgressCurrentLabel = "";
-const AI_BATCH_SIZE_OPTIONS = [20, 50, 100, 200];
+const AI_BATCH_SIZE_OPTIONS = [10, 20, 50, 100, 200];
 
 async function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(btn => {

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, has_request_context, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from storage import load_json as storage_load_json, save_json as storage_save_json
 
@@ -48,7 +48,7 @@ TRACE_API = "https://agent.tanyuai.com/api/im/agent-trace/paginateV2"
 REFERER = "https://agent.tanyuai.com/v2/diagnostic-optimization/optimization-workshop"
 DEFAULT_SECRET_KEY = "change-me-before-public-deploy"
 SHOP_ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}")
-AI_DEFAULT_ISSUE_BATCH_SIZE = 20
+AI_DEFAULT_ISSUE_BATCH_SIZE = 10
 AI_MAX_ISSUE_BATCH_SIZE = 200
 AI_CONNECT_TIMEOUT_SECONDS = 20
 AI_DEFAULT_READ_TIMEOUT_SECONDS = 300
@@ -129,22 +129,46 @@ def now_iso():
 
 def load_users():
     users = load_json(USERS_FILE, {})
-    if users or not ADMIN_PASSWORD:
-        return users
-    admin = {
-        "username": ADMIN_USERNAME,
-        "passwordHash": generate_password_hash(ADMIN_PASSWORD),
-        "role": "admin",
-        "active": True,
-        "expiresAt": "",
-        "createdAt": now_iso(),
-        "updatedAt": now_iso(),
-        "lastLoginAt": "",
-    }
-    users[ADMIN_USERNAME] = admin
-    save_json(USERS_FILE, users)
+    changed = False
+    for username, user in list(users.items()):
+        if not isinstance(user, dict):
+            continue
+        if "remark" not in user:
+            user["remark"] = ""
+            changed = True
+        if "systemLocked" not in user:
+            user["systemLocked"] = username == ADMIN_USERNAME
+            changed = True
+        if username == ADMIN_USERNAME:
+            if user.get("role") != "admin":
+                user["role"] = "admin"
+                changed = True
+            if not user.get("active", True):
+                user["active"] = True
+                changed = True
+            if not user.get("systemLocked"):
+                user["systemLocked"] = True
+                changed = True
+            if not user.get("remark"):
+                user["remark"] = "系统默认管理员"
+                changed = True
+    if not users and ADMIN_PASSWORD:
+        users[ADMIN_USERNAME] = {
+            "username": ADMIN_USERNAME,
+            "passwordHash": generate_password_hash(ADMIN_PASSWORD),
+            "role": "admin",
+            "active": True,
+            "expiresAt": "",
+            "remark": "系统默认管理员",
+            "systemLocked": True,
+            "createdAt": now_iso(),
+            "updatedAt": now_iso(),
+            "lastLoginAt": "",
+        }
+        changed = True
+    if changed:
+        save_json(USERS_FILE, users)
     return users
-
 
 def save_users(users):
     save_json(USERS_FILE, users)
@@ -156,6 +180,9 @@ def public_user(user):
         "role": user.get("role", "user"),
         "active": user.get("active", True),
         "expiresAt": user.get("expiresAt", ""),
+        "remark": user.get("remark", ""),
+        "systemLocked": bool(user.get("systemLocked", False)),
+        "hasPassword": bool(user.get("passwordHash")),
         "createdAt": user.get("createdAt", ""),
         "updatedAt": user.get("updatedAt", ""),
         "lastLoginAt": user.get("lastLoginAt", ""),
@@ -321,6 +348,8 @@ def register():
                 "role": "user",
                 "active": True,
                 "expiresAt": "",
+                "remark": "",
+                "systemLocked": False,
                 "createdAt": now_iso(),
                 "updatedAt": now_iso(),
                 "lastLoginAt": now_iso(),
@@ -378,9 +407,11 @@ def api_admin_create_user():
     users[username] = {
         "username": username,
         "passwordHash": generate_password_hash(password),
-        "role": role,
+        "role": "admin" if username == ADMIN_USERNAME else role,
         "active": True,
         "expiresAt": "",
+        "remark": str(data.get("remark", "")).strip(),
+        "systemLocked": username == ADMIN_USERNAME,
         "createdAt": now_iso(),
         "updatedAt": now_iso(),
         "lastLoginAt": "",
@@ -398,21 +429,35 @@ def api_admin_update_user():
     user = users.get(username)
     if not user:
         return jsonify({"success": False, "error": "账号不存在"}), 404
+    locked = bool(user.get("systemLocked")) or username == ADMIN_USERNAME
+    is_self = username == session.get("username")
     if "password" in data:
+        if locked and not is_self:
+            return jsonify({"success": False, "error": "系统锁定账号不可修改密码"}), 400
         password = str(data.get("password", ""))
         if len(password) < 6:
             return jsonify({"success": False, "error": "密码至少 6 位"}), 400
         user["passwordHash"] = generate_password_hash(password)
+    if "remark" in data:
+        if locked and not is_self:
+            return jsonify({"success": False, "error": "系统锁定账号不可修改备注"}), 400
+        user["remark"] = str(data.get("remark", "")).strip()
     if "active" in data:
-        if username == session.get("username") and data.get("active") is False:
-            return jsonify({"success": False, "error": "不能禁用当前登录管理员"}), 400
+        if locked:
+            return jsonify({"success": False, "error": "系统锁定账号不可禁用"}), 400
+        if is_self and data.get("active") is False:
+            return jsonify({"success": False, "error": "不能禁用当前登录账号"}), 400
         user["active"] = bool(data.get("active"))
     if "role" in data:
+        if locked:
+            return jsonify({"success": False, "error": "系统锁定账号不可修改角色"}), 400
         role = str(data.get("role", "")).strip()
         if role not in ("user", "admin"):
             return jsonify({"success": False, "error": "角色不正确"}), 400
         user["role"] = role
     if "expiresAt" in data:
+        if locked:
+            return jsonify({"success": False, "error": "系统锁定账号不可修改到期时间"}), 400
         expires_at = str(data.get("expiresAt", "") or "").strip()
         if expires_at:
             try:
@@ -431,13 +476,15 @@ def api_admin_update_user():
 def api_admin_delete_user():
     username = str((request.get_json() or {}).get("username", "")).strip()
     if username == session.get("username"):
-        return jsonify({"success": False, "error": "不能删除当前登录管理员"}), 400
+        return jsonify({"success": False, "error": "不能删除当前登录账号"}), 400
     users = load_users()
     if username not in users:
         return jsonify({"success": False, "error": "账号不存在"}), 404
+    if username == ADMIN_USERNAME or users[username].get("systemLocked"):
+        return jsonify({"success": False, "error": "系统锁定账号不可删除"}), 400
     admin_count = sum(1 for user in users.values() if user.get("role") == "admin" and user.get("active", True))
     if users[username].get("role") == "admin" and admin_count <= 1:
-        return jsonify({"success": False, "error": "至少保留一个启用管理员"}), 400
+        return jsonify({"success": False, "error": "至少保留一个可用管理员"}), 400
     del users[username]
     save_users(users)
     return jsonify({"success": True})
@@ -1682,30 +1729,111 @@ def handle_error(e):
 # AI Analysis module
 # ============================================================
 
-def load_ai_config():
-    cfg = load_json(AI_CONFIG_FILE, {})
-    # Backward compatibility: migrate old provider-based config to flat config
-    if "providers" in cfg and "activeProvider" in cfg:
-        providers = cfg.get("providers", {})
-        active = cfg.get("activeProvider", "agnes")
+AI_CONFIG_KEYS = tuple(DEFAULT_AI_CONFIG.keys())
+
+
+def current_ai_config_username():
+    if has_request_context():
+        return session.get("username", "")
+    return ""
+
+
+def normalize_ai_config(config):
+    config = config if isinstance(config, dict) else {}
+    normalized = {}
+    for key, default in DEFAULT_AI_CONFIG.items():
+        normalized[key] = config.get(key, default)
+    normalized["baseUrl"] = str(normalized.get("baseUrl", "") or "").strip()
+    normalized["model"] = str(normalized.get("model", "") or "").strip()
+    normalized["apiKey"] = str(normalized.get("apiKey", "") or "").strip()
+    try:
+        normalized["temperature"] = float(normalized.get("temperature", DEFAULT_AI_CONFIG["temperature"]) or DEFAULT_AI_CONFIG["temperature"])
+    except (TypeError, ValueError):
+        normalized["temperature"] = DEFAULT_AI_CONFIG["temperature"]
+    try:
+        normalized["maxTokens"] = int(normalized.get("maxTokens", DEFAULT_AI_CONFIG["maxTokens"]) or DEFAULT_AI_CONFIG["maxTokens"])
+    except (TypeError, ValueError):
+        normalized["maxTokens"] = DEFAULT_AI_CONFIG["maxTokens"]
+    normalized["timeoutSeconds"] = clamp_ai_timeout_seconds(normalized.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS))
+    return normalized
+
+
+def legacy_ai_config_from_store(store):
+    if not isinstance(store, dict):
+        return normalize_ai_config({})
+    if "providers" in store and "activeProvider" in store:
+        providers = store.get("providers", {})
+        active = store.get("activeProvider", "agnes")
         provider = providers.get(active, providers.get("agnes", {}))
-        cfg = {
+        return normalize_ai_config({
             "baseUrl": provider.get("baseUrl", ""),
             "model": provider.get("model", ""),
             "apiKey": provider.get("apiKey", ""),
-            "temperature": cfg.get("temperature", 0.3),
-            "maxTokens": cfg.get("maxTokens", 4096),
-        }
-        save_ai_config(cfg)
-    # Merge with defaults for any missing keys
-    for key, val in DEFAULT_AI_CONFIG.items():
-        if key not in cfg:
-            cfg[key] = val
-    return cfg
+            "temperature": store.get("temperature", 0.3),
+            "maxTokens": store.get("maxTokens", 4096),
+            "timeoutSeconds": store.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS),
+        })
+    return normalize_ai_config({key: store.get(key) for key in AI_CONFIG_KEYS if key in store})
 
 
-def save_ai_config(config):
-    save_json(AI_CONFIG_FILE, config)
+def load_ai_config_store():
+    store = load_json(AI_CONFIG_FILE, {})
+    changed = False
+    if not isinstance(store, dict):
+        store = {}
+        changed = True
+
+    is_scoped_store = isinstance(store.get("users"), dict) or isinstance(store.get("default"), dict)
+    if not is_scoped_store:
+        base_config = legacy_ai_config_from_store(store)
+        users = {}
+        for username in load_users().keys():
+            users[username] = dict(base_config)
+        store = {"default": base_config, "users": users}
+        changed = True
+    else:
+        default_config = normalize_ai_config(store.get("default", {}))
+        if store.get("default") != default_config:
+            store["default"] = default_config
+            changed = True
+        users = store.get("users")
+        if not isinstance(users, dict):
+            users = {}
+            store["users"] = users
+            changed = True
+        for username, config in list(users.items()):
+            normalized = normalize_ai_config(config)
+            if config != normalized:
+                users[username] = normalized
+                changed = True
+
+    if changed:
+        save_json(AI_CONFIG_FILE, store)
+    return store
+
+
+def load_ai_config(username=None):
+    username = username if username is not None else current_ai_config_username()
+    username = str(username or "").strip()
+    store = load_ai_config_store()
+    if username:
+        users = store.setdefault("users", {})
+        if username not in users:
+            users[username] = dict(store.get("default", DEFAULT_AI_CONFIG))
+            save_json(AI_CONFIG_FILE, store)
+        return normalize_ai_config(users.get(username, {}))
+    return normalize_ai_config(store.get("default", {}))
+
+
+def save_ai_config(config, username=None):
+    username = username if username is not None else current_ai_config_username()
+    username = str(username or "").strip()
+    store = load_ai_config_store()
+    if username:
+        store.setdefault("users", {})[username] = normalize_ai_config(config)
+    else:
+        store["default"] = normalize_ai_config(config)
+    save_json(AI_CONFIG_FILE, store)
 
 
 def _mask_api_key(key):
@@ -2028,7 +2156,7 @@ def compact_ai_context(local_analysis, issue_offset=0, issue_limit=None):
     }
 
 
-def build_ai_trace_samples(traces, max_samples=120):
+def build_ai_trace_samples(traces, max_samples=40):
     samples = []
     for record in traces:
         if len(samples) >= max_samples:
@@ -2051,7 +2179,10 @@ def build_ai_trace_samples(traces, max_samples=120):
 
 def build_ai_analysis_prompt_bundle(traces, shop_id, local_analysis=None, issue_offset=0, issue_limit=None):
     local_context = compact_ai_context(local_analysis or {}, issue_offset=issue_offset, issue_limit=issue_limit)
-    trace_samples = build_ai_trace_samples(traces)
+    trace_samples = build_ai_trace_samples(
+        traces,
+        max_samples=max(10, min(20, int(local_context.get("issueBatch", {}).get("limit", 10)))),
+    )
     analysis_context = {
         "shopId": shop_id,
         "issueBatch": local_context.get("issueBatch", {}),
@@ -2298,6 +2429,17 @@ def parse_ai_response(text):
         except (json.JSONDecodeError, ValueError) as exc:
             errors.append(str(exc))
     raise ValueError("; ".join(errors) or "empty AI response")
+
+
+def is_probably_truncated_ai_json_error(error):
+    raw = str(error or "").lower()
+    return any(fragment in raw for fragment in (
+        "unterminated string",
+        "expecting ',' delimiter",
+        "expecting property name",
+        "expecting value",
+        "empty ai response",
+    ))
 
 
 def _as_list(value):
@@ -2588,44 +2730,47 @@ def ai_analyze():
     user_text = prompt_bundle["userText"]
     batch_info = prompt_bundle["analysisContext"].get("issueBatch", {})
 
+    parse_error = None
+    result = None
     err = None
     llm_text = ""
+    request_cfg = dict(cfg)
+    current_prompt = user_text
+    token_retry_plan = [8192, 12000]
     for attempt in range(1, 4):
-        llm_text, err = _call_llm(system_prompt, user_text, cfg)
+        llm_text, err = _call_llm(system_prompt, current_prompt, request_cfg)
         if err:
             if attempt < 3:
                 time.sleep(2 ** (attempt - 1))
                 continue
             break
-        break
-
-    if err:
-        return jsonify({"success": False, "error": format_llm_error(err, attempt=attempt, issue_limit=issue_limit)})
-
-    parse_error = None
-    result = None
-    for parse_attempt in range(1, 3):
         try:
             result = normalize_ai_result(parse_ai_response(llm_text), local_analysis, batch_info)
             break
         except ValueError as exc:
             parse_error = exc
-            if parse_attempt >= 2:
+            if attempt >= 3:
                 break
+            if is_probably_truncated_ai_json_error(exc):
+                next_max_tokens = token_retry_plan[min(attempt - 1, len(token_retry_plan) - 1)]
+                request_cfg["maxTokens"] = max(int(request_cfg.get("maxTokens", 0) or 0), next_max_tokens)
             repair_prompt = (
                 user_text
-                + "\n\n上一次输出不是可解析 JSON。请重新输出更紧凑的 JSON 对象："
-                + "不要 Markdown，不要解释文字，数组最多 6 项，必须闭合所有括号。"
+                + "\n\n上一次输出不是可解析 JSON。请重新输出更紧凑且完整闭合的 JSON 对象。"
+                + "不要 Markdown，不要解释文字；数组最多 6 项；所有字符串、数组和对象必须闭合；不要在 JSON 中间截断。"
             )
-            llm_text, err = _call_llm(system_prompt, repair_prompt, cfg)
-            if err:
-                return jsonify({"success": False, "error": f"LLM 修复输出失败: {err}"})
+            current_prompt = repair_prompt
+            time.sleep(1)
+
+    if err:
+        return jsonify({"success": False, "error": format_llm_error(err, attempt=attempt, issue_limit=issue_limit)})
 
     if result is None:
         raw_preview = str(llm_text or "")[:800]
+        token_hint = "后端已自动用更高 Max Tokens 重试；仍失败时建议把“每批”调到 5，或把 Max Tokens 调到 12000 后重试。"
         error_text = (
             f"AI 返回格式解析失败: {parse_error}"
-            "\n建议：把 Max Tokens 调到 8192 或 12000 后重试。"
+            f"\n建议：{token_hint}"
             f"\n原始内容: {raw_preview}"
         )
         return jsonify({"success": False, "error": error_text})

@@ -193,10 +193,21 @@ class AiDeepAnalysisPromptTests(unittest.TestCase):
             context["localAnalysis"]["issueWorkbench"][0]["knowledgeCardDraft"]["standardQuestion"],
             "退货规则是什么",
         )
-        self.assertLessEqual(len(context["traceSamples"]), 120)
+        self.assertLessEqual(len(context["traceSamples"]), 20)
         self.assertIn("待补知识卡片", bundle["userText"])
         self.assertIn("问题优化工作台", bundle["userText"])
         self.assertIn("退货规则是什么", bundle["userText"])
+
+    def test_prompt_bundle_scales_trace_samples_with_batch_size(self):
+        bundle = qa_app.build_ai_analysis_prompt_bundle(
+            self.sample_traces() * 50,
+            "shop_1",
+            self.local_analysis(issue_count=60),
+            issue_offset=0,
+            issue_limit=10,
+        )
+
+        self.assertLessEqual(len(bundle["analysisContext"]["traceSamples"]), 10)
 
     def test_compact_ai_context_limits_large_local_analysis_sections(self):
         compact = qa_app.compact_ai_context(
@@ -279,6 +290,11 @@ class AiResponseParsingTests(unittest.TestCase):
 
         self.assertEqual(result["summary"], "ok")
         self.assertEqual(result["classifications"], [])
+
+    def test_truncated_ai_json_error_is_detected(self):
+        error = 'Unterminated string starting at: line 351 column 24 (char 10116)'
+
+        self.assertTrue(qa_app.is_probably_truncated_ai_json_error(error))
 
     def test_normalize_ai_result_backfills_deep_dashboard_fields_from_legacy_shape(self):
         local = AiDeepAnalysisPromptTests().local_analysis(issue_count=1, qa_count=1, topic_count=1)
@@ -467,7 +483,7 @@ class AiTemplateDeepResultTests(unittest.TestCase):
             "复制转人工规则",
             "data-copy-ai-script",
             "aiTimeoutSeconds",
-            '<option value="20" selected>20</option>',
+            '<option value="10" selected>10</option>',
             "接口慢或超时先用 20",
         ):
             self.assertIn(token, html)

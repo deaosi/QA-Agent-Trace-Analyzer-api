@@ -7,6 +7,8 @@ import sys
 import threading
 import time
 import tkinter as tk
+import urllib.error
+import urllib.request
 import webbrowser
 from datetime import datetime
 from tkinter import messagebox, ttk
@@ -18,8 +20,18 @@ ENV_FILE = os.path.join(PROJECT_DIR, ".env")
 PID_FILE = os.path.join(PROJECT_DIR, "server.pid")
 LOG_FILE = os.path.join(PROJECT_DIR, "server.log")
 ERR_LOG_FILE = os.path.join(PROJECT_DIR, "server.log.err")
+TUNNEL_PID_FILE = os.path.join(PROJECT_DIR, "cloudflared.pid")
+TUNNEL_LOG_FILE = os.path.join(PROJECT_DIR, "cloudflared.log")
+TUNNEL_ERR_LOG_FILE = os.path.join(PROJECT_DIR, "cloudflared.log.err")
+CLOUDFLARED_EXE = os.path.join(PROJECT_DIR, "cloudflared.exe")
+TUNNEL_METRICS_PORT = "9090"
+TUNNEL_READY_URL = f"http://127.0.0.1:{TUNNEL_METRICS_PORT}/ready"
 DEFAULT_DATA_DIR = os.path.join(PROJECT_DIR, "data")
 DEPLOY_SCRIPT = os.path.join(PROJECT_DIR, "deploy_only.bat")
+WINDOWS_BACKGROUND_FLAGS = (
+    subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+    if os.name == "nt" else 0
+)
 
 
 def load_env_file(path=ENV_FILE):
@@ -46,6 +58,10 @@ def build_runtime_config(env_values=None):
         "QA_ACCESS_PASSWORD": env_values.get("QA_ACCESS_PASSWORD") or env_values.get("QA_ADMIN_PASSWORD") or "",
         "QA_SECRET_KEY": env_values.get("QA_SECRET_KEY") or "",
         "QA_DATA_DIR": env_values.get("QA_DATA_DIR") or DEFAULT_DATA_DIR,
+        "QA_PUBLIC_URL": env_values.get("QA_PUBLIC_URL") or "https://diamondruby.xyz",
+        "QA_TUNNEL_ENABLED": env_values.get("QA_TUNNEL_ENABLED") or "0",
+        "QA_TUNNEL_TOKEN": env_values.get("QA_TUNNEL_TOKEN") or "",
+        "QA_TUNNEL_NAME": env_values.get("QA_TUNNEL_NAME") or "",
     }
 
 
@@ -64,6 +80,65 @@ def build_waitress_command(port):
     ]
 
 
+def tunnel_enabled(config):
+    value = str(config.get("QA_TUNNEL_ENABLED", "")).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def build_cloudflared_command(config):
+    token = str(config.get("QA_TUNNEL_TOKEN", "")).strip()
+    tunnel_name = str(config.get("QA_TUNNEL_NAME", "")).strip()
+    if not token and not tunnel_name:
+        return []
+    command = [
+        CLOUDFLARED_EXE,
+        "tunnel",
+        "--no-autoupdate",
+        "--edge-ip-version",
+        "4",
+        "--protocol",
+        "http2",
+        "--loglevel",
+        "info",
+        "--metrics",
+        f"127.0.0.1:{TUNNEL_METRICS_PORT}",
+        "run",
+        "--dns-resolver-addrs",
+        "1.1.1.1:53",
+    ]
+    if token:
+        command.extend(["--token", token])
+    else:
+        command.append(tunnel_name)
+    return [
+        *command,
+    ]
+
+
+def build_child_env(config, base_env=None):
+    base_env = dict(base_env or os.environ)
+    if os.name != "nt":
+        env = dict(base_env)
+        env.update(config)
+        return env
+
+    env = {}
+    seen = {}
+    for key, value in base_env.items():
+        folded = key.upper()
+        if folded in seen:
+            existing_key = seen[folded]
+            if key == "Path" and existing_key != "Path":
+                env.pop(existing_key, None)
+                env[key] = value
+                seen[folded] = key
+            continue
+        env[key] = value
+        seen[folded] = key
+    env.update(config)
+    return env
+
+
 def is_process_running(pid):
     try:
         os.kill(pid, 0)
@@ -74,17 +149,76 @@ def is_process_running(pid):
         return False
 
 
-def read_pid():
+def parse_netstat_listening_pids(output, port):
+    pids = set()
+    port = str(port)
+    for raw_line in str(output or "").splitlines():
+        parts = raw_line.split()
+        if len(parts) < 5 or parts[0].upper() != "TCP":
+            continue
+        local_address = parts[1]
+        state = parts[3].upper()
+        pid = parts[-1]
+        if state == "LISTENING" and local_address.endswith(f":{port}") and pid.isdigit():
+            pids.add(int(pid))
+    return sorted(pids)
+
+
+def listening_pids_on_port(port):
+    if os.name != "nt":
+        return []
     try:
-        with open(PID_FILE, "r", encoding="utf-8") as handle:
+        result = subprocess.run(
+            ["netstat", "-ano", "-p", "tcp"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return parse_netstat_listening_pids(result.stdout, port)
+
+
+def tunnel_ready(timeout=2):
+    try:
+        with urllib.request.urlopen(TUNNEL_READY_URL, timeout=timeout) as response:
+            return response.status == 200
+    except (OSError, urllib.error.URLError):
+        return False
+
+
+def stop_process_tree(pid):
+    if not pid:
+        return False
+    try:
+        if os.name == "nt":
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            return result.returncode == 0
+        os.kill(pid, signal.SIGTERM)
+        time.sleep(0.5)
+        return True
+    except Exception:
+        return False
+
+
+def read_pid(path=PID_FILE):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
             return int(handle.read().strip())
     except (OSError, ValueError):
         return None
 
 
-def remove_pid_file():
+def remove_pid_file(path=PID_FILE):
     try:
-        os.remove(PID_FILE)
+        os.remove(path)
     except OSError:
         pass
 
@@ -93,6 +227,7 @@ class ServicePanel(tk.Tk):
     def __init__(self):
         super().__init__()
         self.proc = None
+        self.tunnel_proc = None
         self.log_thread = None
         self.env_values = {}
         self.config = build_runtime_config({})
@@ -101,7 +236,7 @@ class ServicePanel(tk.Tk):
         self.geometry("760x560")
         self.minsize(720, 520)
         self.configure(bg="#f4f6f8")
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.build_ui()
         self.refresh_config()
         self.check_status()
@@ -172,7 +307,10 @@ class ServicePanel(tk.Tk):
         self.env_values = load_env_file()
         self.config = build_runtime_config(self.env_values)
         self.url_var.set(self.local_url)
-        self.config_var.set(f"端口: {self.config['QA_PORT']}    数据目录: {self.config['QA_DATA_DIR']}")
+        tunnel_text = "已启用" if tunnel_enabled(self.config) else "未启用"
+        self.config_var.set(
+            f"端口: {self.config['QA_PORT']}    数据目录: {self.config['QA_DATA_DIR']}    内网穿透: {tunnel_text}"
+        )
 
     def append_log(self, text):
         self.log_text.configure(state="normal")
@@ -223,14 +361,17 @@ class ServicePanel(tk.Tk):
 
     def start_service(self):
         self.refresh_config()
-        if self.running:
+        running_pids = listening_pids_on_port(self.config["QA_PORT"])
+        if self.running or running_pids:
+            if running_pids:
+                self.update_status(True, f"运行中 (PID: {running_pids[0]})")
+                self.start_tunnel()
             messagebox.showinfo("提示", "服务已经在运行。")
             return
         if not self.validate_ready_to_start():
             return
         os.makedirs(self.config["QA_DATA_DIR"], exist_ok=True)
-        env = os.environ.copy()
-        env.update(self.config)
+        env = build_child_env(self.config)
         command = build_waitress_command(self.config["QA_PORT"])
         try:
             stdout = open(LOG_FILE, "a", encoding="utf-8", errors="replace")
@@ -242,6 +383,7 @@ class ServicePanel(tk.Tk):
                 handle.write(str(self.proc.pid))
             self.update_status(True, f"运行中 (PID: {self.proc.pid})")
             self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已启动: {self.local_url}")
+            self.start_tunnel()
             self.log_thread = threading.Thread(target=self.watch_process, daemon=True)
             self.log_thread.start()
         except Exception as exc:
@@ -249,23 +391,127 @@ class ServicePanel(tk.Tk):
             self.append_log(f"[ERROR] 启动失败: {exc}")
             messagebox.showerror("启动失败", str(exc))
 
+    def start_tunnel(self):
+        if not tunnel_enabled(self.config):
+            return
+        if not os.path.exists(CLOUDFLARED_EXE):
+            self.append_log("[WARN] 已启用内网穿透，但找不到 cloudflared.exe")
+            return
+        command = build_cloudflared_command(self.config)
+        if not command:
+            self.append_log("[WARN] 已启用内网穿透，但 .env 缺少 QA_TUNNEL_TOKEN 或 QA_TUNNEL_NAME")
+            return
+
+        pid = read_pid(TUNNEL_PID_FILE)
+        metrics_pids = listening_pids_on_port(TUNNEL_METRICS_PORT)
+        if tunnel_ready():
+            running_pid = pid or (metrics_pids[0] if metrics_pids else None)
+            if running_pid and (not pid or pid != running_pid):
+                with open(TUNNEL_PID_FILE, "w", encoding="utf-8") as handle:
+                    handle.write(str(running_pid))
+            suffix = f" PID: {running_pid}" if running_pid else ""
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 内网穿透已在线{suffix}")
+            return
+        if pid and is_process_running(pid):
+            self.append_log(f"[WARN] 内网穿透进程存在但未就绪，正在重启 PID: {pid}")
+            stop_process_tree(pid)
+            remove_pid_file(TUNNEL_PID_FILE)
+
+        env = build_child_env(self.config)
+        try:
+            stdout = open(TUNNEL_LOG_FILE, "a", encoding="utf-8", errors="replace")
+            stderr = open(TUNNEL_ERR_LOG_FILE, "a", encoding="utf-8", errors="replace")
+            stdout.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting tunnel for {self.config['QA_PUBLIC_URL']}\n")
+            stdout.flush()
+            self.tunnel_proc = subprocess.Popen(
+                command,
+                cwd=PROJECT_DIR,
+                env=env,
+                stdout=stdout,
+                stderr=stderr,
+                text=True,
+                creationflags=WINDOWS_BACKGROUND_FLAGS,
+            )
+            with open(TUNNEL_PID_FILE, "w", encoding="utf-8") as handle:
+                handle.write(str(self.tunnel_proc.pid))
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 内网穿透已启动: {self.config['QA_PUBLIC_URL']} (PID: {self.tunnel_proc.pid})")
+        except Exception as exc:
+            self.append_log(f"[WARN] 启动内网穿透失败: {exc}")
+
+    def stop_tunnel(self):
+        pids = set()
+        pid = read_pid(TUNNEL_PID_FILE)
+        if pid:
+            pids.add(pid)
+        if self.tunnel_proc and self.tunnel_proc.pid:
+            pids.add(self.tunnel_proc.pid)
+        for metrics_pid in listening_pids_on_port(TUNNEL_METRICS_PORT):
+            pids.add(metrics_pid)
+        if not pids:
+            remove_pid_file(TUNNEL_PID_FILE)
+            self.tunnel_proc = None
+            return
+
+        stopped = []
+        failed = []
+        for target_pid in sorted(pids):
+            if stop_process_tree(target_pid):
+                stopped.append(target_pid)
+            else:
+                failed.append(target_pid)
+        if stopped:
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 内网穿透已停止 PID: {', '.join(map(str, stopped))}")
+        if failed:
+            self.append_log(f"[WARN] 内网穿透停止失败 PID: {', '.join(map(str, failed))}")
+        remove_pid_file(TUNNEL_PID_FILE)
+        self.tunnel_proc = None
+        if tunnel_ready():
+            self.append_log("[WARN] 已请求停止，但内网穿透仍然在线，请检查是否还有其他 cloudflared 实例")
+
     def stop_service(self):
+        self.refresh_config()
+        self.stop_tunnel()
+        pids = set()
         pid = read_pid()
-        if not pid:
+        if pid:
+            pids.add(pid)
+        if self.proc and self.proc.pid:
+            pids.add(self.proc.pid)
+        for port_pid in listening_pids_on_port(self.config["QA_PORT"]):
+            pids.add(port_pid)
+
+        if not pids:
+            remove_pid_file()
+            self.proc = None
             self.update_status(False, "未运行")
             return
-        try:
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+
+        stopped = []
+        failed = []
+        for target_pid in sorted(pids):
+            if stop_process_tree(target_pid):
+                stopped.append(target_pid)
             else:
-                os.kill(pid, signal.SIGTERM)
-                time.sleep(0.5)
-            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 已请求停止服务 PID: {pid}")
-        except Exception as exc:
-            self.append_log(f"[WARN] 停止服务失败: {exc}")
+                failed.append(target_pid)
+
+        time.sleep(0.6)
+        remaining = listening_pids_on_port(self.config["QA_PORT"])
+        if remaining:
+            self.append_log(f"[WARN] 已请求停止，但端口 {self.config['QA_PORT']} 仍被 PID 占用: {', '.join(map(str, remaining))}")
+            self.update_status(True, f"运行中 (PID: {remaining[0]})")
+            if failed:
+                self.append_log(f"[WARN] 停止失败 PID: {', '.join(map(str, failed))}")
+            return
+
+        if stopped:
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已停止 PID: {', '.join(map(str, stopped))}")
         remove_pid_file()
         self.proc = None
         self.update_status(False, "未运行")
+
+    def on_close(self):
+        self.stop_service()
+        self.destroy()
 
     def restart_service(self):
         self.stop_service()
@@ -286,8 +532,10 @@ class ServicePanel(tk.Tk):
 
     def check_status(self):
         pid = read_pid()
-        if pid and is_process_running(pid):
-            self.update_status(True, f"运行中 (PID: {pid})")
+        port_pids = listening_pids_on_port(self.config["QA_PORT"])
+        if port_pids:
+            self.update_status(True, f"运行中 (PID: {port_pids[0]})")
+            self.start_tunnel()
         else:
             if pid:
                 remove_pid_file()
