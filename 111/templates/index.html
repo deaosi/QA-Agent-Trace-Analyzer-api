@@ -31,6 +31,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
 .status{font-size:12px;color:var(--muted)}.pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:650}
 .checkbar{display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#f8fafc}.checkbar label{display:inline-flex;align-items:center;gap:6px;color:#344054}
 input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}.progress{display:none;margin-top:14px}.progress-track{height:7px;background:#e4e7ec;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:var(--primary);transition:width .2s}.progress-meta{display:flex;justify-content:space-between;margin-top:5px;font-size:12px;color:var(--muted)}
+.ai-progress-visual{border:1px solid #dbeafe;background:linear-gradient(180deg,#f8fbff,#fff);border-radius:10px;padding:12px;box-shadow:0 10px 24px rgba(22,119,255,.08)}.ai-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.ai-progress-title{font-weight:780;color:#0f172a}.ai-progress-sub{font-size:12px;color:var(--muted);margin-top:3px}.ai-progress-pct{font-size:20px;font-weight:820;color:#0958d9;line-height:1}.ai-progress-visual .progress-track{height:10px;background:#e8eef7;position:relative}.ai-progress-visual .progress-bar{position:relative;background:linear-gradient(90deg,#1677ff,#4f46e5,#14b8a6);box-shadow:0 0 14px rgba(22,119,255,.28);overflow:hidden}.ai-progress-flow::after{content:"";position:absolute;inset:0;width:46%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);transform:translateX(-120%);opacity:0}.ai-progress-visual.is-running .ai-progress-flow::after{opacity:1;animation:aiProgressFlow 1.05s linear infinite}.ai-progress-stages{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:11px}.ai-progress-stage{min-height:34px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 8px;color:#667085;font-size:12px;display:flex;align-items:center;gap:6px}.ai-progress-stage::before{content:"";width:8px;height:8px;border-radius:999px;background:#cbd5e1;box-shadow:0 0 0 3px #f2f4f7;flex:0 0 auto}.ai-progress-stage.active{border-color:#93c5fd;background:#eff6ff;color:#0958d9;font-weight:750}.ai-progress-stage.active::before{background:#1677ff;box-shadow:0 0 0 4px rgba(22,119,255,.14)}.ai-progress-stage.done{color:#027a48}.ai-progress-stage.done::before{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.14)}.ai-progress-detail-panel{display:grid;grid-template-columns:1.15fr .95fr .9fr;gap:10px;margin-top:12px}.ai-progress-detail-card{border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:10px;min-height:78px}.ai-progress-detail-label{font-size:12px;color:#667085;font-weight:750;margin-bottom:6px}.ai-progress-detail-card b{display:block;color:#0f172a;margin-bottom:5px}.ai-progress-detail-card ul{margin:0;padding-left:18px;color:#475467;line-height:1.6;font-size:12px}.ai-progress-detail-card li{margin:1px 0}.ai-progress-wait{color:#475467;font-size:12px;line-height:1.55}.ai-progress-next{color:#0958d9;font-size:12px;line-height:1.55;font-weight:700}@keyframes aiProgressFlow{from{transform:translateX(-120%)}to{transform:translateX(240%)}}
 .log{display:none;white-space:pre-wrap;margin-top:12px;max-height:220px;overflow:auto;background:#0f172a;color:#d1d5db;padding:12px;border-radius:6px;font:12px/1.6 Consolas,monospace}
 .result-card{margin-top:14px}.result-title{font-size:14px;font-weight:750;margin:0 0 8px}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:8px;background:#fbfcfe}
 .diagnosis-grid{display:grid;grid-template-columns:1.1fr repeat(4,1fr);gap:10px;margin-bottom:14px}.diagnosis-main{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:10px;padding:16px;box-shadow:var(--shadow-lg)}.score{font-size:34px;font-weight:820;line-height:1}.score-label{color:#cbd5e1;margin-top:6px}.diagnosis-card{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fff}.diagnosis-value{font-size:22px;font-weight:780}.diagnosis-label{color:var(--muted);font-size:12px;margin-top:4px}.diagnosis-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.summary-box{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px}.summary-box b{display:block;margin-bottom:6px}.summary-box ul{margin:0;padding-left:18px;color:#475467;line-height:1.7}
@@ -38,6 +39,8 @@ input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}.progres
 .topic-dashboard{margin:14px 0 18px}.topic-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px}.topic-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-kpi strong{font-size:22px;display:block}.topic-kpi span{font-size:12px;color:var(--muted)}.topic-layout{display:grid;grid-template-columns:1.2fr .8fr;gap:10px}.topic-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.topic-panel-title{font-weight:780;margin-bottom:10px}.rank-row{display:grid;grid-template-columns:110px 1fr 72px;gap:10px;align-items:center;margin:10px 0}.rank-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rank-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.rank-fill{height:100%;background:linear-gradient(90deg,#1677ff,#4f46e5);border-radius:999px}.rank-meta{text-align:right;color:#475467;font-size:12px}.topic-heat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.heat-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fbfcfe}.heat-title{font-weight:750}.heat-sub{color:var(--muted);font-size:12px;margin-top:4px}.heat-risk{margin-top:8px;font-weight:800}.keyword-cloud{display:flex;gap:6px;flex-wrap:wrap}.keyword{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;background:#f2f4f7;color:#344054;font-weight:650;font-size:12px}
 .identity-dashboard{margin:0 0 18px}.identity-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}.identity-kpi{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-kpi strong{font-size:22px;display:block}.identity-kpi span{font-size:12px;color:var(--muted)}.identity-layout{display:grid;grid-template-columns:1fr 1fr;gap:10px}.identity-panel{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px}.identity-list{display:grid;gap:8px}.identity-row{display:grid;grid-template-columns:1fr 70px;gap:10px;align-items:start;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;padding:9px}.identity-name{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.identity-meta{font-size:12px;color:var(--muted);margin-top:3px;word-break:break-all}.identity-count{text-align:right;font-weight:800;color:#175cd3}.trace-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.trace-chip{display:inline-flex;max-width:180px;height:22px;align-items:center;padding:0 7px;border-radius:6px;background:#f2f4f7;color:#344054;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .knowledge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 18px}.knowledge-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px;box-shadow:var(--shadow)}.knowledge-title{font-weight:780;color:#101828;margin-bottom:8px}.knowledge-line{font-size:12px;color:#475467;line-height:1.55;margin-top:6px}.kw{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:999px;background:#eef4ff;color:#175cd3;margin:3px 4px 0 0;font-size:12px;font-weight:650}
+.ai-evidence-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 18px}.ai-evidence-card{border:1px solid var(--line);border-radius:8px;background:#fbfcfe;padding:10px}.ai-evidence-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.ai-chat-pair{display:grid;gap:7px;margin-top:8px}.ai-chat-bubble{border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.55;word-break:break-word}.ai-chat-q{background:#f1f5f9;color:#1e293b}.ai-chat-a{background:#ecfdf3;color:#1e293b}.ai-template-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:10px;margin-top:10px}.ai-template-box pre{white-space:pre-wrap;margin:8px 0 0;color:#0f172a;font:12px/1.55 Consolas,"SFMono-Regular",monospace}.ai-template-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:760;color:#1d4ed8}
+.ai-quality-workbench{margin:14px 0 18px}.ai-quality-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}.ai-quality-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.ai-quality-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px;box-shadow:var(--shadow)}.ai-quality-title{font-weight:780;color:#101828;line-height:1.4}.ai-quality-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.ai-script-box{border:1px solid #dbeafe;background:#f8fbff;border-radius:8px;padding:10px;margin-top:9px}.ai-script-label{font-size:12px;font-weight:760;color:#175cd3;margin-bottom:5px}.ai-script-text{font-size:12px;line-height:1.6;color:#1f2937;white-space:pre-wrap}.ai-script-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.ai-batch-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed #bfdbfe;background:#eff6ff;border-radius:8px;padding:10px 12px;margin-top:12px}
 table{width:100%;border-collapse:collapse;margin-top:8px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;vertical-align:top}th{color:#475467;background:#f8fafc;font-weight:700}
 th{white-space:nowrap}
 .topic-bar{height:6px;background:#e4e7ec;border-radius:999px;overflow:hidden;margin-top:5px}.topic-fill{height:100%;background:var(--primary)}.qa-q{font-weight:650;color:#0958d9}.qa-a{color:#334155;white-space:pre-wrap}.qa-a,.issue-suggestion{max-height:92px;overflow:auto;padding-right:4px}
@@ -60,7 +63,7 @@ td{overflow-wrap:break-word;word-break:break-all}
 /* AI config form */
 .ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ai-form-grid .field{min-width:0}.ai-form-grid .field.full{grid-column:1/-1}
 @media(max-width:600px){.ai-form-grid{grid-template-columns:1fr}}
-@media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}.brand span{font-size:15px}.settings-menu{right:-2px}}
+@media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout,.ai-progress-detail-panel,.ai-quality-grid{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}.brand span{font-size:15px}.settings-menu{right:-2px}}
 </style>
 </head>
 <body>
@@ -188,7 +191,6 @@ td{overflow-wrap:break-word;word-break:break-all}
               <button class="btn" onclick="reanalyzeCurrent()">重新分析已有数据</button>
               <button class="btn" onclick="refresh()">刷新概览</button>
               <button class="btn" onclick="exportChat()">导出聊天记录</button>
-              <button class="btn btn-primary" onclick="toggleChatViewer()">聊天记录</button>
             </div>
             <span id="filterSummary" class="status"></span>
           </div>
@@ -205,16 +207,7 @@ td{overflow-wrap:break-word;word-break:break-all}
         <div class="card-body" id="resultArea"><div id="resultBody"><div class="empty">暂无结果</div></div></div>
       </section>
 
-      <section class="card" id="chatViewerPanel">
-        <div class="card-header"><span>聊天记录</span><button class="btn btn-sm" onclick="toggleChatViewer()">收起</button></div>
-        <div class="card-body" style="padding:0;overflow:hidden">
-          <div style="padding:10px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span id="chatTotal" class="qa-count">加载中...</span>
-            <div class="pager-jump" style="margin-left:auto"><span>跳至</span><input id="chatJumpInput" type="number" min="1" onkeydown="if(event.key==='Enter')jumpChatPage()"><span>页</span><button class="btn btn-sm" onclick="jumpChatPage()">确定</button></div>
-          </div>
-          <div style="overflow:auto;max-height:60vh" id="chatList"><div class="empty" style="padding:40px">点击"重新分析已有数据"或"抓取并分析"后加载数据</div></div>
-        </div>
-      </section>
+
     </section>
   </section>
   </div>
@@ -235,6 +228,7 @@ td{overflow-wrap:break-word;word-break:break-all}
           <div class="ai-form-grid" style="margin-top:10px">
             <div class="field"><label>Temperature</label><input id="aiTemperature" type="number" min="0" max="2" step="0.1" value="0.3"></div>
             <div class="field"><label>Max Tokens</label><input id="aiMaxTokens" type="number" min="1" value="4096"></div>
+            <div class="field"><label>Read Timeout(s)</label><input id="aiTimeoutSeconds" type="number" min="60" max="900" step="30" value="300"></div>
           </div>
           <div class="toolbar" style="margin-top:12px">
             <div class="action-row">
@@ -253,19 +247,50 @@ td{overflow-wrap:break-word;word-break:break-all}
           <div class="section-title">使用说明</div>
           <div class="knowledge-line" style="line-height:1.7">
             使用 AI 对当前店铺的 trace 数据进行深度分析，包括智能分类、根因诊断、知识卡片生成和优化建议。<br>
-            需要先选择店铺并抓取数据，然后配置好 API。
+            需要先选择店铺并抓取数据，然后配置好 API。接口慢或超时先用 20 条一批，稳定后再选 50/100/200。
           </div>
           <div class="toolbar" style="margin-top:14px">
             <div class="action-row">
               <button class="btn btn-primary" id="aiGoBtn" onclick="runAiAnalysis()">运行 AI 分析</button>
               <button class="btn btn-danger" id="aiStopBtn" style="display:none" onclick="cancelAiAnalysis()">停止</button>
+              <label class="status" style="display:inline-flex;align-items:center;gap:6px">每批
+                <select id="aiBatchSize" style="width:82px;height:32px"><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select>
+              </label>
               <button class="btn" onclick="clearAiResults()">清空结果</button>
             </div>
             <span id="aiRunStatus" class="status"></span>
           </div>
-          <div class="progress" id="aiProgressWrap" style="margin-top:12px">
-            <div class="progress-track"><div class="progress-bar" id="aiProgressBar"></div></div>
-            <div class="progress-meta"><span id="aiProgressLabel"></span><span id="aiProgressPct"></span></div>
+          <div class="progress ai-progress-visual" id="aiProgressWrap" style="margin-top:12px">
+            <div class="ai-progress-head" id="aiProgressVisual">
+              <div>
+                <div class="ai-progress-title">AI 正在深度分析</div>
+                <div class="ai-progress-sub"><span id="aiProgressLabel"></span><span id="aiElapsedText"></span></div>
+              </div>
+              <div class="ai-progress-pct" id="aiProgressPct">0%</div>
+            </div>
+            <div class="progress-track"><div class="progress-bar ai-progress-flow" id="aiProgressBar"></div></div>
+            <div class="ai-progress-stages" id="aiProgressStageList">
+              <span class="ai-progress-stage" data-stage-pct="10">准备请求</span>
+              <span class="ai-progress-stage" data-stage-pct="35">读取本地诊断</span>
+              <span class="ai-progress-stage" data-stage-pct="62">调用模型</span>
+              <span class="ai-progress-stage" data-stage-pct="88">整理结论</span>
+              <span class="ai-progress-stage" data-stage-pct="100">生成仪表板</span>
+            </div>
+            <div class="ai-progress-detail-panel" id="aiProgressDetailPanel">
+              <div class="ai-progress-detail-card">
+                <div class="ai-progress-detail-label">当前阶段</div>
+                <b id="aiProgressCurrentStep">正在准备分析...</b>
+                <div class="ai-progress-wait" id="aiProgressWaitHint">正在校验店铺与 AI 配置。</div>
+              </div>
+              <div class="ai-progress-detail-card">
+                <div class="ai-progress-detail-label">已完成</div>
+                <ul id="aiProgressDetailList"><li>等待开始</li></ul>
+              </div>
+              <div class="ai-progress-detail-card">
+                <div class="ai-progress-detail-label">下一步</div>
+                <div class="ai-progress-next" id="aiProgressNextStep">读取本地诊断与 trace 样本</div>
+              </div>
+            </div>
           </div>
           <div class="log" id="aiLog"></div>
         </div>
@@ -568,7 +593,6 @@ function renderAnalysis(d){
   $("resultBody").innerHTML = html;
   renderIssueWorkbench();
   renderQaPage();
-  showChatViewer();
 }
 
 function renderDiagnosis(d){
@@ -1239,112 +1263,17 @@ async function exportChat(){
   a.click();
 }
 
-let chatPage = 1;
-const CHAT_PAGE_SIZE = 30;
-
-function toggleChatViewer(){
-  const panel = $("chatViewerPanel");
-  if(!panel) return;
-  if(panel.style.display === "none"){
-    panel.style.display = "";
-    loadChatPage(chatPage);
-  } else {
-    panel.style.display = "none";
-  }
-}
-
-function showChatViewer(){
-  const panel = $("chatViewerPanel");
-  if(!panel) return;
-  panel.style.display = "";
-  loadChatPage(chatPage);
-}
-
-async function loadChatPage(page){
-  page = page || 1;
-  chatPage = page;
-  const sid = $("shopId").value.trim() || currentShop;
-  if(!sid){
-    $("chatList").innerHTML = '<div class="empty" style="padding:40px">请先选择店铺</div>';
-    return;
-  }
-  $("chatList").innerHTML = '<div class="empty" style="padding:40px">加载中...</div>';
-  const beginTime = $("beginTime").value;
-  const endTime = $("endTime").value;
-  const r = await post("/api/chat-records", {
-    shopId: sid,
-    beginTime: beginTime || "",
-    endTime: endTime || "",
-    page: page,
-    pageSize: CHAT_PAGE_SIZE,
-  });
-  if(!r.success){
-    $("chatList").innerHTML = '<div class="empty" style="padding:40px">' + escapeHtml(r.error || "加载失败") + '</div>';
-    return;
-  }
-  renderChatList(r);
-}
-
-function renderChatList(r){
-  const total = r.total || 0;
-  const totalPages = r.totalPages || 1;
-  const currentPage = r.page || 1;
-  $("chatTotal").textContent = `共 ${total} 条 · 第 ${currentPage}/${totalPages} 页`;
-
-  if(!r.records || !r.records.length){
-    $("chatList").innerHTML = '<div class="empty" style="padding:40px">没有匹配的聊天记录</div>';
-    return;
-  }
-
-  let html = '<table style="width:100%">';
-  html += '<tr><th style="width:80px">时间</th><th style="width:120px">买家</th><th style="width:100px">商品</th><th>用户问题</th><th>智能体回复</th></tr>';
-
-  r.records.forEach(rec => {
-    const qText = rec.question || "-";
-    const aText = rec.answer || "-";
-    const buyerShort = rec.buyer ? (rec.buyer.length > 16 ? rec.buyer.substring(0,8)+"..."+rec.buyer.slice(-8) : rec.buyer) : "-";
-    const productShort = rec.product ? (rec.product.length > 20 ? rec.product.substring(0,18)+"..." : rec.product) : "-";
-
-    html += '<tr>';
-    html += `<td style="white-space:nowrap;color:var(--muted);font-size:12px">${escapeHtml(rec.time)}</td>`;
-    html += `<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">
-      <span style="display:inline-flex;align-items:center;gap:4px">
-        <span style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.buyer||"-")}">${escapeHtml(buyerShort)}</span>
-        ${rec.buyer && rec.buyer !== "-" ? '<button class="btn btn-sm" style="height:22px;padding:0 6px;font-size:11px;line-height:1" data-copy-buyer="' + escapeHtml(rec.buyer) + '" title="复制买家昵称">复制</button>' : ''}
-      </span>
-    </td>`;
-    html += `<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(rec.product||"-")}">${escapeHtml(productShort)}</td>`;
-    html += `<td style="max-width:400px"><div style="font-weight:650;color:#0958d9;margin-bottom:4px">${escapeHtml(qText)}</div>`;
-    if(rec.topic) html += `<div style="font-size:11px;color:var(--muted)">话题：${escapeHtml(rec.topic)}</div>`;
-    html += '</td>';
-    html += `<td style="max-width:400px"><div style="color:#334155;white-space:pre-wrap;max-height:120px;overflow:auto">${escapeHtml(aText)}</div></td>`;
-    html += '</tr>';
-  });
-
-  html += '</table>';
-
-  // Pagination controls
-  html += '<div class="pager" style="margin-top:8px;padding:0 12px 8px">';
-  html += `<button class="page-btn" onclick="loadChatPage(${currentPage-1})" ${currentPage<=1?"disabled":""}>‹ 上一页</button>`;
-  html += `<span class="qa-count" style="margin:0 8px">第 ${currentPage} / ${totalPages} 页</span>`;
-  html += `<button class="page-btn" onclick="loadChatPage(${currentPage+1})" ${currentPage>=totalPages?"disabled":""}>下一页 ›</button>`;
-  html += '</div>';
-
-  $("chatList").innerHTML = html;
-}
-
-function jumpChatPage(){
-  const val = Number($("chatJumpInput")?.value || chatPage);
-  if(val < 1) return;
-  loadChatPage(val);
-}
-
 // ============================================================
 // AI Analysis tab functions
 // ============================================================
 
 let aiAbortCtrl = null;
 let aiLastResult = null;
+let aiProgressTicker = null;
+let aiProgressStartedAt = 0;
+let aiVisualPct = 0;
+let aiProgressCurrentLabel = "";
+const AI_BATCH_SIZE_OPTIONS = [20, 50, 100, 200];
 
 async function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -1371,6 +1300,7 @@ async function loadAiConfig(){
     $("aiApiKey").placeholder = cfg.apiKeyMasked ? "已配置" : "sk-...";
     $("aiTemperature").value = cfg.temperature || 0.3;
     $("aiMaxTokens").value = cfg.maxTokens || 4096;
+    $("aiTimeoutSeconds").value = cfg.timeoutSeconds || 300;
 
     $("aiConfigStatus").textContent = cfg.apiKeyMasked ? "已配置" : "未配置";
   } catch(e) {
@@ -1384,6 +1314,7 @@ async function saveAiConfig(){
   const apiKey = $("aiApiKey").value.trim();
   const temperature = parseFloat($("aiTemperature").value) || 0.3;
   const maxTokens = parseInt($("aiMaxTokens").value) || 4096;
+  const timeoutSeconds = parseInt($("aiTimeoutSeconds").value) || 300;
 
   if(!baseUrl || !model){
     alert("请填写 Base URL 和 Model");
@@ -1395,6 +1326,7 @@ async function saveAiConfig(){
     model: model,
     temperature: temperature,
     maxTokens: maxTokens,
+    timeoutSeconds: timeoutSeconds,
   };
   // Only send apiKey if user actually typed something (don't overwrite saved key)
   if(apiKey) payload.apiKey = apiKey;
@@ -1446,13 +1378,154 @@ function aiLog(msg){
   el.scrollTop = el.scrollHeight;
 }
 
-function setAiProgress(pct, label){
-  $("aiProgressBar").style.width = pct + "%";
-  $("aiProgressPct").textContent = pct + "%";
-  $("aiProgressLabel").textContent = label;
+function formatAiElapsed(ms){
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(seconds / 60);
+  const sec = String(seconds % 60).padStart(2, "0");
+  return min ? `${min}:${sec}` : `${seconds}s`;
 }
 
-async function runAiAnalysis(){
+function updateAiProgressStages(pct){
+  const stages = Array.from(document.querySelectorAll("#aiProgressStageList [data-stage-pct]"));
+  let activeIndex = 0;
+  stages.forEach((stage, index) => {
+    const stagePct = Number(stage.dataset.stagePct || 0);
+    if(pct >= stagePct) activeIndex = index;
+  });
+  stages.forEach((stage, index) => {
+    const stagePct = Number(stage.dataset.stagePct || 0);
+    stage.classList.toggle("done", pct >= stagePct);
+    stage.classList.toggle("active", pct < 100 && index === activeIndex);
+  });
+}
+
+function aiProgressElapsedHint(){
+  if(!aiProgressStartedAt) return "";
+  const elapsed = Date.now() - aiProgressStartedAt;
+  if(elapsed > 120000) return "模型仍在生成深度结论，可能是样本较多或网络较慢，请不要刷新页面。";
+  if(elapsed > 60000) return "模型仍在生成，页面会继续等待返回，请不要刷新页面。";
+  if(elapsed > 30000) return "等待模型返回中，数据量较大时这一步会比较久。";
+  return "";
+}
+
+function aiProgressDetailFor(pct, label){
+  const text = label || aiProgressCurrentLabel || "";
+  if(text.includes("失败") || text.includes("出错")){
+    return {current:"分析未完成", done:["请求已结束"], wait:"AI 分析返回异常，请查看下方日志里的错误原因。", next:"检查 API 配置、网络或模型返回内容后重新运行。"};
+  }
+  if(text.includes("停止")){
+    return {current:"已停止", done:["已取消当前等待"], wait:"本次 AI 分析已被手动停止。", next:"需要继续时可以重新运行 AI 分析。"};
+  }
+  if(pct >= 100 || text.includes("完成")){
+    return {current:"仪表板已生成", done:["AI 结果已返回", "JSON 已解析", "深度仪表板已渲染"], wait:"分析完成，可以查看下方知识卡片、问题优化工作台和 QA 模板。", next:"按优先级处理高风险问题并复制可用模板。"};
+  }
+  if(pct >= 90 || text.includes("整理")){
+    return {current:"整理结论", done:["AI 结果已返回", "正在解析结构化结论"], wait:"正在补齐仪表板字段、证据样本和可复制 QA 模板。", next:"生成 AI 深度仪表板。"};
+  }
+  if(pct >= 62){
+    return {current:"AI 正在生成深度结论", done:["本地诊断已读取", "聊天样本已打包", "请求已发送给模型"], wait:"等待模型返回，这一步耗时取决于样本量和模型响应速度。", next:"解析模型输出并整理结论。"};
+  }
+  if(pct >= 35){
+    return {current:"读取本地诊断", done:["已确认店铺 ID", "已准备 AI 请求参数"], wait:"正在整理本地分析、问题工作台和典型 QA 样本。", next:"调用模型生成深度分析。"};
+  }
+  if(pct >= 10){
+    return {current:"准备请求", done:["已创建分析任务"], wait:"正在校验店铺、API 配置和可用数据。", next:"读取本地诊断与 trace 样本。"};
+  }
+  return {current:"正在准备分析...", done:["等待开始"], wait:"正在校验店铺与 AI 配置。", next:"读取本地诊断与 trace 样本。"};
+}
+
+function updateAiProgressDetails(pct, label){
+  const panel = $("aiProgressDetailPanel");
+  if(!panel) return;
+  const detail = aiProgressDetailFor(pct, label);
+  const extraHint = aiProgressElapsedHint();
+  $("aiProgressCurrentStep").textContent = detail.current;
+  $("aiProgressWaitHint").textContent = extraHint || detail.wait;
+  $("aiProgressNextStep").textContent = detail.next;
+  $("aiProgressDetailList").innerHTML = detail.done.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function updateAiProgressVisual(pct, label){
+  const safePct = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  aiVisualPct = safePct;
+  if(label) aiProgressCurrentLabel = label;
+  $("aiProgressBar").style.width = safePct + "%";
+  $("aiProgressPct").textContent = safePct + "%";
+  $("aiProgressLabel").textContent = aiProgressCurrentLabel || "正在准备分析...";
+  if(aiProgressStartedAt){
+    $("aiElapsedText").textContent = ` · 已用时 ${formatAiElapsed(Date.now() - aiProgressStartedAt)}`;
+  }
+  updateAiProgressStages(safePct);
+  updateAiProgressDetails(safePct, aiProgressCurrentLabel);
+}
+
+function setAiProgress(pct, label){
+  updateAiProgressVisual(pct, label);
+}
+
+function startAiProgressTicker(){
+  stopAiProgressTicker();
+  aiProgressStartedAt = Date.now();
+  aiVisualPct = 0;
+  aiProgressCurrentLabel = "正在准备分析...";
+  $("aiProgressWrap").classList.add("is-running");
+  updateAiProgressVisual(6, aiProgressCurrentLabel);
+  aiProgressTicker = setInterval(() => {
+    const elapsed = Date.now() - aiProgressStartedAt;
+    const cap = elapsed > 45000 ? 88 : elapsed > 22000 ? 80 : elapsed > 9000 ? 68 : 54;
+    const nextPct = Math.min(cap, aiVisualPct + (aiVisualPct < 40 ? 3 : 1));
+    updateAiProgressVisual(nextPct, aiProgressCurrentLabel);
+  }, 900);
+}
+
+function stopAiProgressTicker(finalPct, finalLabel){
+  if(aiProgressTicker){
+    clearInterval(aiProgressTicker);
+    aiProgressTicker = null;
+  }
+  $("aiProgressWrap").classList.remove("is-running");
+  if(finalPct !== undefined){
+    updateAiProgressVisual(finalPct, finalLabel || aiProgressCurrentLabel);
+  }
+}
+
+function getAiBatchSize(){
+  const raw = Number($("aiBatchSize")?.value || AI_BATCH_SIZE_OPTIONS[0]);
+  return AI_BATCH_SIZE_OPTIONS.includes(raw) ? raw : AI_BATCH_SIZE_OPTIONS[0];
+}
+
+function aiBatchInfo(data){
+  return data?.aiBatchInfo || data?.issueBatch || {};
+}
+
+function mergeAiUnique(baseItems, nextItems, keyFn){
+  const seen = new Set();
+  const merged = [];
+  aiArray(baseItems).concat(aiArray(nextItems)).forEach(item => {
+    const key = keyFn(item) || JSON.stringify(item);
+    if(seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+  return merged;
+}
+
+function mergeAiAnalysisResult(base, next){
+  if(!base) return next;
+  const merged = {...base, ...next};
+  merged.pendingKnowledgeCards = mergeAiUnique(base.pendingKnowledgeCards, next.pendingKnowledgeCards, item => item.sourceIssueIds?.join("|") || item.standardQuestion || item.title);
+  merged.knowledgeCards = mergeAiUnique(base.knowledgeCards, next.knowledgeCards, item => item.standardQuestion || item.title);
+  merged.issueOptimizationWorkbench = mergeAiUnique(base.issueOptimizationWorkbench, next.issueOptimizationWorkbench, item => item.issueId || item.topic + "|" + item.rootCause);
+  merged.qualityInspectionWorkbench = merged.issueOptimizationWorkbench;
+  merged.typicalQAExamples = mergeAiUnique(base.typicalQAExamples, next.typicalQAExamples, item => item.topic + "|" + item.question);
+  merged.topicDeepDives = mergeAiUnique(base.topicDeepDives, next.topicDeepDives, item => item.topic);
+  merged.actionPlan = mergeAiUnique(base.actionPlan, next.actionPlan, item => item.phase + "|" + item.task);
+  merged.riskAlerts = mergeAiUnique(base.riskAlerts, next.riskAlerts, item => item.title || item.evidence);
+  merged.aiBatchInfo = aiBatchInfo(next);
+  return merged;
+}
+
+async function requestAiAnalysisBatch(offset=0, append=false){
   const sid = $("shopId")?.value.trim() || currentShop;
   if(!sid) return alert("请先选择或输入店铺 ID");
 
@@ -1461,47 +1534,68 @@ async function runAiAnalysis(){
   $("aiStopBtn").style.display = "inline-flex";
   $("aiProgressWrap").style.display = "block";
   $("aiLog").style.display = "block";
-  $("aiLog").textContent = "";
-  $("aiResultCard").style.display = "none";
-  $("aiRunStatus").textContent = "分析中...";
+  if(!append){
+    $("aiLog").textContent = "";
+    $("aiResultCard").style.display = "none";
+    aiLastResult = null;
+  }
+  const limit = getAiBatchSize();
+  $("aiRunStatus").textContent = append ? "继续生成中..." : "分析中...";
 
   aiAbortCtrl = new AbortController();
-  setAiProgress(10, "正在调用 AI 分析...");
-  aiLog(`=== 店铺: ${sid} ===`);
+  startAiProgressTicker();
+  setAiProgress(10, append ? "正在生成下一批 AI 质检话术..." : "正在调用 AI 分析...");
+  aiLog(`=== Shop: ${sid} | batch ${offset + 1}-${offset + limit} ===`);
 
   try {
-    const r = await post("/api/ai/analyze", {shopId: sid});
+    const r = await post("/api/ai/analyze", {shopId: sid, issueOffset: offset, issueLimit: limit});
     if(!r.success){
       aiLog("[ERR] " + (r.error || "分析失败"));
       $("aiRunStatus").textContent = "分析失败";
+      stopAiProgressTicker(aiVisualPct, "分析失败");
       resetAiBtn();
       return;
     }
 
-    setAiProgress(90, "正在渲染结果...");
-    aiLog("[OK] AI 分析完成");
-    aiLastResult = r.data;
-    renderAiResults(r.data);
-    setAiProgress(100, "完成");
-    $("aiRunStatus").textContent = "分析完成";
+    setAiProgress(90, "正在整理分析结论...");
+    const info = aiBatchInfo(r.data);
+    aiLog(`[OK] batch done: ${(info.offset || 0) + 1}-${info.nextOffset || 0} / ${info.total || 0}`);
+    aiLastResult = append ? mergeAiAnalysisResult(aiLastResult, r.data) : r.data;
+    renderAiResults(aiLastResult);
+    stopAiProgressTicker(100, info.hasMore ? "本批完成，可继续生成下一批" : "分析完成，仪表板已生成");
+    $("aiRunStatus").textContent = info.hasMore ? "本批完成，可继续生成" : "分析完成";
   } catch(e){
     aiLog("[ERR] " + e.message);
+    stopAiProgressTicker(aiVisualPct, "分析出错");
     $("aiRunStatus").textContent = "分析出错";
   }
 
-  resetAiBtn();
+  resetAiBtn({hideProgress:false});
+}
+
+async function runAiAnalysis(){
+  await requestAiAnalysisBatch(0, false);
+}
+
+async function loadMoreAiAnalysis(){
+  const info = aiBatchInfo(aiLastResult);
+  await requestAiAnalysisBatch(Number(info.nextOffset || 0), true);
 }
 
 function cancelAiAnalysis(){
   if(aiAbortCtrl) aiAbortCtrl.abort();
+  stopAiProgressTicker(aiVisualPct, "已停止");
   resetAiBtn();
   $("aiLog").textContent += "[CANCELLED]\n";
 }
 
-function resetAiBtn(){
+function resetAiBtn(options={}){
   $("aiGoBtn").style.display = "inline-flex";
   $("aiStopBtn").style.display = "none";
-  $("aiProgressWrap").style.display = "none";
+  stopAiProgressTicker();
+  if(options.hideProgress !== false){
+    $("aiProgressWrap").style.display = "none";
+  }
   aiAbortCtrl = null;
 }
 
@@ -1511,7 +1605,14 @@ function clearAiResults(){
   $("aiResultBody").innerHTML = '<div class="empty">暂无分析结果</div>';
   $("aiLog").textContent = "";
   $("aiRunStatus").textContent = "";
+  aiProgressStartedAt = 0;
+  window._aiScriptTexts = {};
+  window._aiScriptCounter = 0;
+  stopAiProgressTicker(0, "");
+  $("aiProgressWrap").style.display = "none";
+  $("aiElapsedText").textContent = "";
 }
+
 
 function priorityClassAi(priority){
   if(priority === "高") return "badge-high";
@@ -1526,105 +1627,340 @@ function issueTypeClass(type){
   return "badge-low";
 }
 
+function aiArray(value){ return Array.isArray(value) ? value : []; }
+function aiCount(value){ return aiArray(value).length; }
+function aiField(value, fallback="-"){
+  if(value === null || value === undefined || value === "") return fallback;
+  return value;
+}
+
+function aiDashboardKpis(data){
+  const summary = data.executiveSummary || {};
+  const cards = aiArray(data.pendingKnowledgeCards?.length ? data.pendingKnowledgeCards : data.knowledgeCards);
+  const issues = aiArray(data.issueOptimizationWorkbench?.length ? data.issueOptimizationWorkbench : data.classifications);
+  const topics = aiArray(data.topicDeepDives);
+  const risks = aiArray(data.riskAlerts);
+  const highIssues = issues.filter(item => item.priority === "高" || item.level === "高").length;
+  return [
+    {label:"健康分", value: aiField(summary.healthScore, "-"), hint: summary.mainConclusion || data.summary || "暂无总结"},
+    {label:"待补卡片", value: cards.length, hint:"可直接落知识库的候选卡"},
+    {label:"高风险问题", value: highIssues, hint:"优先处理的问题簇"},
+    {label:"知识缺口", value: summary.knowledgeGapCount ?? cards.length, hint:"需要补齐的主题和规则"},
+    {label:"主题深挖", value: topics.length, hint:"AI 已拆解的高频主题"},
+    {label:"风险提醒", value: risks.length, hint:"可能影响采纳或转化的信号"},
+  ];
+}
+
+function renderAiDashboard(data){
+  const summary = data.executiveSummary || {};
+  const topRisks = aiArray(summary.topRisks).concat(aiArray(data.riskAlerts).map(item => item.title || item.evidence).filter(Boolean)).slice(0, 5);
+  const quickWins = aiArray(summary.quickWins).concat(aiArray(data.actionPlan).map(item => item.task).filter(Boolean)).slice(0, 5);
+  let html = '<div class="topic-dashboard ai-dashboard-panel" id="aiDashboardPanel">';
+  html += '<div class="issue-head"><div><div class="result-title" style="margin:0">AI 深度仪表板</div><div class="qa-count">把 AI 结论先汇总成可执行的优化看板，再展开明细</div></div></div>';
+  html += '<div class="topic-kpis">';
+  aiDashboardKpis(data).forEach(kpi => {
+    html += `<div class="topic-kpi"><strong>${escapeHtml(kpi.value)}</strong><span>${escapeHtml(kpi.label)}</span><div class="heat-sub">${escapeHtml(kpi.hint)}</div></div>`;
+  });
+  html += '</div>';
+  html += '<div class="diagnosis-summary">';
+  html += '<div class="summary-box"><b>高风险提醒</b>';
+  html += topRisks.length ? `<ul>${topRisks.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : '<div class="knowledge-line">暂无明确高风险</div>';
+  html += '</div>';
+  html += '<div class="summary-box"><b>今日优先动作</b>';
+  html += quickWins.length ? `<ul>${quickWins.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : '<div class="knowledge-line">暂无快速收益动作</div>';
+  html += '</div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderAiSectionTitle(title, count){
+  const suffix = count === undefined ? "" : `<span class="qa-count">${count} 项</span>`;
+  return `<div class="qa-head" style="margin-top:18px"><div class="result-title" style="margin:0">${escapeHtml(title)}</div>${suffix}</div>`;
+}
+
+function aiEvidenceIdentity(example){
+  example = example || {};
+  return {
+    traceId: example.traceId,
+    buyerId: example.buyerId,
+    buyerIdRaw: example.buyerIdRaw || example.buyerId,
+    productTitle: example.productTitle,
+    productId: example.productId,
+    spuId: example.spuId,
+    skuId: example.skuId,
+  };
+}
+
+function aiTemplateText(template){
+  template = template || {};
+  const lines = [];
+  lines.push(`Q:${template.standardQuestion || ""}`);
+  lines.push(`A:${template.standardAnswer || ""}`);
+  if(aiArray(template.similarQuestions).length) lines.push(`相似问:${aiArray(template.similarQuestions).join(" / ")}`);
+  if(aiArray(template.triggerWords).length) lines.push(`触发词:${aiArray(template.triggerWords).join(" / ")}`);
+  if(template.manualHandoffRule) lines.push(`转人工:${template.manualHandoffRule}`);
+  if(template.applicableScene) lines.push(`适用场景:${template.applicableScene}`);
+  if(template.notApplicableScene) lines.push(`不适用:${template.notApplicableScene}`);
+  if(template.acceptanceGoal) lines.push(`验收:${template.acceptanceGoal}`);
+  return lines.filter(line => line.replace(/^[A-Z\u4e00-\u9fa5]+:/, "").trim()).join("\n");
+}
+
+function aiRegisterCopyText(text){
+  if(!window._aiScriptTexts) window._aiScriptTexts = {};
+  if(!window._aiScriptCounter) window._aiScriptCounter = 0;
+  window._aiScriptCounter += 1;
+  const id = "aiScript_" + window._aiScriptCounter;
+  window._aiScriptTexts[id] = text || "";
+  return id;
+}
+
+function aiScriptButton(label, text){
+  const id = aiRegisterCopyText(text);
+  return `<button class="btn btn-sm" data-copy-ai-script="${id}">${escapeHtml(label)}</button>`;
+}
+
+function renderAiQaTemplate(template){
+  const text = aiTemplateText(template);
+  if(!text) return "";
+  if(!window._aiTemplateTexts) window._aiTemplateTexts = {};
+  if(!window._aiTemplateCounter) window._aiTemplateCounter = 0;
+  window._aiTemplateCounter += 1;
+  const id = "aiTpl_" + window._aiTemplateCounter;
+  window._aiTemplateTexts[id] = text;
+  return `<div class="ai-template-box"><div class="ai-template-title"><span>可复制 QA 模板</span><button class="btn btn-sm" data-copy-template="${id}">复制模板</button></div><pre>${escapeHtml(text)}</pre></div>`;
+}
+
+function renderAiEvidenceExamples(examples){
+  examples = aiArray(examples).slice(0, 3);
+  if(!examples.length) return "";
+  let html = '<div class="ai-evidence-grid">';
+  examples.forEach((example, idx) => {
+    html += '<div class="ai-evidence-card">';
+    html += `<div class="ai-evidence-head"><b>聊天记录 ${idx + 1}</b><span class="qa-count">${escapeHtml(example.traceId || "-")}</span></div>`;
+    html += traceIdentityHtml(aiEvidenceIdentity(example));
+    html += `<div class="knowledge-line"><b>买家：</b>${escapeHtml(example.buyerId || "-")} <b style="margin-left:8px">商品：</b>${escapeHtml(example.productTitle || example.productId || "-")}</div>`;
+    html += '<div class="ai-chat-pair">';
+    html += `<div class="ai-chat-bubble ai-chat-q"><b>Q：</b>${escapeHtml(example.question || "-")}</div>`;
+    html += `<div class="ai-chat-bubble ai-chat-a"><b>A：</b>${escapeHtml(example.currentAnswer || example.answer || "-")}</div>`;
+    html += '</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderAiEvidenceBlock(item){
+  const evidence = renderAiEvidenceExamples(item?.evidenceExamples);
+  const template = renderAiQaTemplate(item?.qaTemplate || item);
+  return evidence || template ? evidence + template : "";
+}
+
+document.addEventListener("click", function(e){
+  const copyTarget = e.target.closest("[data-copy-template],[data-copy-ai-script]");
+  if(!copyTarget) return;
+  const templateId = copyTarget.getAttribute("data-copy-template");
+  const scriptId = copyTarget.getAttribute("data-copy-ai-script");
+  const text = templateId
+    ? (window._aiTemplateTexts ? window._aiTemplateTexts[templateId] : "")
+    : (window._aiScriptTexts ? window._aiScriptTexts[scriptId] : "");
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(function(){
+    const orig = copyTarget.textContent;
+    copyTarget.textContent = "已复制";
+    copyTarget.style.background = "#039855";
+    copyTarget.style.borderColor = "#039855";
+    copyTarget.style.color = "#fff";
+    setTimeout(function(){ copyTarget.textContent = orig; copyTarget.style.background = ""; copyTarget.style.borderColor = ""; copyTarget.style.color = ""; }, 1200);
+  }).catch(function(){});
+});
+
+function aiIssueTemplate(item){
+  const tpl = item.qaTemplate || {};
+  return {
+    customerServiceReply: item.customerServiceReply || tpl.customerServiceReply || tpl.standardAnswer || item.suggestedAction || "",
+    knowledgeBaseAnswer: item.knowledgeBaseAnswer || tpl.knowledgeBaseAnswer || tpl.standardAnswer || "",
+    manualHandoffScript: item.manualHandoffScript || tpl.manualHandoffScript || tpl.manualHandoffRule || "",
+    copyReadyTemplate: item.copyReadyTemplate || tpl.copyReadyTemplate || aiTemplateText(tpl || item),
+    avoidWords: aiArray(item.avoidWords?.length ? item.avoidWords : tpl.avoidWords),
+    qualityChecklist: aiArray(item.qualityChecklist?.length ? item.qualityChecklist : tpl.qualityChecklist),
+  };
+}
+
+function renderAiQualityWorkbench(data){
+  const issues = aiArray(data.qualityInspectionWorkbench?.length ? data.qualityInspectionWorkbench : data.issueOptimizationWorkbench);
+  if(!issues.length) return "";
+  const batch = aiBatchInfo(data);
+  const generated = batch.total ? Math.min(batch.nextOffset || issues.length, batch.total) : issues.length;
+  let html = '<div class="ai-quality-workbench" id="aiQualityWorkbench">';
+  html += '<div class="ai-quality-head"><div><div class="result-title" style="margin:0">AI 质检话术工作台</div>';
+  html += `<div class="qa-count">已生成 ${escapeHtml(issues.length)} 条话术卡片${batch.total ? `，当前进度 ${escapeHtml(generated)} / ${escapeHtml(batch.total)}` : ""}</div></div>`;
+  html += `<div class="status">每批 ${escapeHtml(batch.limit || getAiBatchSize())} 条</div></div>`;
+  html += '<div class="ai-quality-grid">';
+  issues.forEach((item, idx) => {
+    const tpl = aiIssueTemplate(item);
+    const evidence = aiArray(item.evidenceExamples)[0] || {};
+    html += '<div class="ai-quality-card">';
+    html += `<div class="ai-quality-title">${escapeHtml(item.topic || item.issueType || item.qaTemplate?.standardQuestion || "质检问题")}</div>`;
+    html += '<div class="ai-quality-meta">';
+    html += `<span class="badge ${priorityClassAi(item.priority)}">${escapeHtml(item.priority || "中")}</span>`;
+    html += `<span class="badge ${issueTypeClass(item.issueType)}">${escapeHtml(item.issueType || "待质检")}</span>`;
+    if(item.ownerHint) html += `<span class="badge issue-status">${escapeHtml(item.ownerHint)}</span>`;
+    html += '</div>';
+    html += `<div class="knowledge-line"><b>买家：</b>${escapeHtml(evidence.buyerId || "-")} <b style="margin-left:8px">商品：</b>${escapeHtml(evidence.productTitle || evidence.productId || "-")}</div>`;
+    html += `<div class="knowledge-line"><b>用户问题：</b>${escapeHtml(evidence.question || item.qaTemplate?.standardQuestion || "-")}</div>`;
+    html += `<div class="knowledge-line"><b>当前回复：</b>${escapeHtml(evidence.currentAnswer || "-")}</div>`;
+    html += `<div class="knowledge-line"><b>失败原因：</b>${escapeHtml(item.rootCause || item.failureReason || item.impact || "-")}</div>`;
+    html += `<div class="ai-script-box"><div class="ai-script-label">客服可用话术</div><div class="ai-script-text">${escapeHtml(tpl.customerServiceReply || "-")}</div></div>`;
+    html += `<div class="ai-script-box"><div class="ai-script-label">知识库答案</div><div class="ai-script-text">${escapeHtml(tpl.knowledgeBaseAnswer || "-")}</div></div>`;
+    if(tpl.manualHandoffScript) html += `<div class="ai-script-box"><div class="ai-script-label">转人工规则</div><div class="ai-script-text">${escapeHtml(tpl.manualHandoffScript)}</div></div>`;
+    if(tpl.avoidWords.length) html += `<div class="knowledge-line"><b>避免表达：</b>${tpl.avoidWords.map(escapeHtml).join(" / ")}</div>`;
+    if(tpl.qualityChecklist.length) html += `<div class="knowledge-line"><b>质检清单：</b>${tpl.qualityChecklist.map(escapeHtml).join("；")}</div>`;
+    html += '<div class="ai-script-actions">';
+    html += aiScriptButton("复制客服回复", tpl.customerServiceReply);
+    html += aiScriptButton("复制知识库答案", tpl.knowledgeBaseAnswer);
+    html += aiScriptButton("复制转人工规则", tpl.manualHandoffScript);
+    html += aiScriptButton("复制完整模板", tpl.copyReadyTemplate);
+    html += '</div>';
+    html += renderAiEvidenceBlock(item);
+    html += '</div>';
+  });
+  html += '</div>';
+  if(batch.hasMore){
+    html += `<div class="ai-batch-footer"><div><b>还有后续质检数据</b><div class="qa-count">已到第 ${escapeHtml(batch.nextOffset || generated)} 条，共 ${escapeHtml(batch.total || "-")} 条。可以继续生成下一批，前面结果会保留。</div></div><button class="btn btn-primary" onclick="loadMoreAiAnalysis()">继续生成下一批</button></div>`;
+  } else if(batch.total){
+    html += `<div class="ai-batch-footer"><div><b>全部批次已生成</b><div class="qa-count">已覆盖 ${escapeHtml(batch.total)} 条质检数据。</div></div></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderAiResults(data){
   if(!data) return;
-
+  window._aiScriptTexts = {};
+  window._aiScriptCounter = 0;
   $("aiResultCard").style.display = "";
+  const executiveSummary = data.executiveSummary || {};
+  const pendingKnowledgeCards = aiArray(data.pendingKnowledgeCards?.length ? data.pendingKnowledgeCards : data.knowledgeCards);
+  const issueOptimizationWorkbench = aiArray(data.issueOptimizationWorkbench?.length ? data.issueOptimizationWorkbench : data.classifications);
+  const typicalQAExamples = aiArray(data.typicalQAExamples);
+  const topicDeepDives = aiArray(data.topicDeepDives);
+  const actionPlan = aiArray(data.actionPlan?.length ? data.actionPlan : data.recommendations?.map(task => ({phase:"建议", task})));
+  const riskAlerts = aiArray(data.riskAlerts);
+  let html = renderAiDashboard(data);
 
-  let html = "";
-
-  // Summary section
-  if(data.summary){
-    html += `<div class="summary-box" style="margin-bottom:14px"><b>📋 分析总结</b><div class="knowledge-line">${escapeHtml(data.summary)}</div></div>`;
+  if(executiveSummary.mainConclusion || data.summary){
+    html += `<div class="summary-box" style="margin-bottom:14px"><b>分析总结</b><div class="knowledge-line">${escapeHtml(executiveSummary.mainConclusion || data.summary || "-")}</div></div>`;
   }
 
-  // Recommendations
-  if(data.recommendations && data.recommendations.length){
-    html += '<div class="summary-box" style="margin-bottom:14px"><b>💡 优化建议</b><ul>';
-    data.recommendations.forEach(rec => {
-      html += `<li>${escapeHtml(rec)}</li>`;
-    });
-    html += '</ul></div>';
-  }
+  html += renderAiQualityWorkbench(data);
 
-  // Classifications table
-  if(data.classifications && data.classifications.length){
-    html += '<div class="section-title">智能分类结果</div>';
-    html += '<table class="ai-result-table"><tr><th>优先级</th><th>问题类型</th><th>话题</th><th>标准问法</th><th>根本原因</th><th>建议动作</th><th>次数</th></tr>';
-    data.classifications.forEach(c => {
-      html += `<tr>
-        <td><span class="badge ${priorityClassAi(c.priority)}">${escapeHtml(c.priority)}</span></td>
-        <td><span class="badge ${issueTypeClass(c.issueType)}">${escapeHtml(c.issueType)}</span></td>
-        <td>${escapeHtml(c.topic || "-")}</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(c.standardQuestion || "")}">${escapeHtml(c.standardQuestion || "-")}</td>
-        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(c.rootCause || "")}">${escapeHtml(c.rootCause || "-")}</td>
-        <td>${escapeHtml(c.suggestedAction || "-")}</td>
-        <td>${c.count || 0}</td>
-      </tr>`;
-    });
-    html += '</table>';
-  }
-
-  // Knowledge cards
-  if(data.knowledgeCards && data.knowledgeCards.length){
-    html += '<div class="section-title" style="margin-top:18px">AI 生成知识卡片</div>';
+  if(pendingKnowledgeCards.length){
+    html += renderAiSectionTitle("待补知识卡片", pendingKnowledgeCards.length);
     html += '<div class="knowledge-grid">';
-    data.knowledgeCards.forEach(card => {
+    pendingKnowledgeCards.forEach(card => {
       html += '<div class="knowledge-card">';
-      html += `<div class="knowledge-title">${escapeHtml(card.title || card.standardQuestion?.substring(0, 20) || "知识卡片")}</div>`;
+      html += `<div class="knowledge-title">${escapeHtml(card.title || card.standardQuestion?.substring(0, 24) || "知识卡片")}</div>`;
+      html += `<div class="knowledge-line"><b>优先级：</b>${escapeHtml(card.priority || "-")} <b style="margin-left:8px">主题：</b>${escapeHtml(card.topic || "-")}</div>`;
       html += `<div class="knowledge-line"><b>标准问：</b>${escapeHtml(card.standardQuestion || "-")}</div>`;
-      if(card.similarQuestions && card.similarQuestions.length){
-        html += `<div class="knowledge-line"><b>相似问：</b>${card.similarQuestions.map(q => `<span class="kw">${escapeHtml(q)}</span>`).join("")}</div>`;
-      }
-      if(card.triggerWords && card.triggerWords.length){
-        html += `<div class="knowledge-line"><b>触发词：</b>${card.triggerWords.map(w => `<span class="kw">${escapeHtml(w)}</span>`).join("")}</div>`;
-      }
+      if(card.similarQuestions?.length) html += `<div class="knowledge-line"><b>相似问：</b>${card.similarQuestions.map(q => `<span class="kw">${escapeHtml(q)}</span>`).join("")}</div>`;
+      if(card.triggerWords?.length) html += `<div class="knowledge-line"><b>触发词：</b>${card.triggerWords.map(w => `<span class="kw">${escapeHtml(w)}</span>`).join("")}</div>`;
       html += `<div class="knowledge-line"><b>标准答案：</b>${escapeHtml(card.standardAnswer || "-")}</div>`;
       html += `<div class="knowledge-line"><b>转人工：</b>${escapeHtml(card.manualHandoffRule || "-")}</div>`;
+      if(card.acceptanceGoal) html += `<div class="knowledge-line"><b>验收目标：</b>${escapeHtml(card.acceptanceGoal)}</div>`;
+      html += renderAiEvidenceBlock(card);
       html += '</div>';
     });
     html += '</div>';
   }
 
-  if(!data.classifications?.length && !data.knowledgeCards?.length){
-    html = '<div class="empty">AI 未返回有效结果，请检查 API 配置</div>';
+  if(typicalQAExamples.length){
+    html += renderAiSectionTitle("典型 QA 实例", typicalQAExamples.length);
+    html += '<table><tr><th>主题</th><th>用户问题</th><th>当前回复</th><th>优化后回复</th><th>优化理由</th></tr>';
+    typicalQAExamples.forEach(item => {
+      html += `<tr><td>${escapeHtml(item.topic || "-")}</td><td class="qa-q">${escapeHtml(item.question || "-")}</td><td class="qa-a">${escapeHtml(item.currentAnswer || "-")}</td><td class="qa-a">${escapeHtml(item.optimizedAnswer || "-")}</td><td>${escapeHtml(item.whyBetter || "-")}</td></tr>`;
+    });
+    html += '</table>';
+    typicalQAExamples.forEach(item => {
+      const evidence = renderAiEvidenceExamples(item.evidenceExamples);
+      if(evidence) html += `<div class="summary-box" style="margin-top:10px"><b>${escapeHtml(item.topic || "典型 QA")}</b>${evidence}</div>`;
+    });
   }
 
-  $("aiResultBody").innerHTML = html;
+  if(topicDeepDives.length){
+    html += renderAiSectionTitle("主题深挖", topicDeepDives.length);
+    html += '<div class="topic-heat">';
+    topicDeepDives.forEach(topic => {
+      html += `<div class="heat-card"><div class="heat-title">${escapeHtml(topic.topic || "-")}</div><div class="heat-sub">量级：${escapeHtml(topic.volume || 0)} ? 风险：${escapeHtml(topic.riskLevel || "-")}</div>`;
+      if(topic.knowledgeGaps?.length) html += `<div class="knowledge-line"><b>知识缺口：</b>${topic.knowledgeGaps.map(escapeHtml).join("；")}</div>`;
+      html += `<div class="knowledge-line"><b>追问模式：</b>${escapeHtml(topic.conversationPattern || "-")}</div><div class="knowledge-line"><b>处理策略：</b>${escapeHtml(topic.recommendedPlaybook || "-")}</div></div>`;
+    });
+    html += '</div>';
+  }
+
+  if(actionPlan.length){
+    html += renderAiSectionTitle("行动计划", actionPlan.length);
+    html += '<table><tr><th>阶段</th><th>任务</th><th>预期收益</th><th>完成标准</th></tr>';
+    actionPlan.forEach(item => {
+      html += `<tr><td>${escapeHtml(item.phase || "-")}</td><td>${escapeHtml(item.task || item || "-")}</td><td>${escapeHtml(item.expectedImpact || "-")}</td><td>${escapeHtml(item.doneDefinition || "-")}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  if(riskAlerts.length){
+    html += renderAiSectionTitle("风险提醒", riskAlerts.length);
+    html += '<table><tr><th>等级</th><th>风险</th><th>证据</th><th>缓解动作</th></tr>';
+    riskAlerts.forEach(item => {
+      html += `<tr><td><span class="badge ${priorityClassAi(item.level)}">${escapeHtml(item.level || "-")}</span></td><td>${escapeHtml(item.title || "-")}</td><td>${escapeHtml(item.evidence || "-")}</td><td>${escapeHtml(item.mitigation || "-")}</td></tr>`;
+    });
+    html += '</table>';
+  }
+
+  $("aiResultBody").innerHTML = html || '<div class="empty">AI 未返回有效结果，请检查 API 配置</div>';
 }
 
 function exportAiResults(){
   if(!aiLastResult) return;
   const d = aiLastResult;
   const rows = [];
-
-  if(d.classifications){
-    rows.push(["优先级", "问题类型", "话题", "标准问法", "根本原因", "建议动作", "次数"]);
-    d.classifications.forEach(c => {
-      rows.push([c.priority, c.issueType, c.topic, c.standardQuestion, c.rootCause, c.suggestedAction, c.count]);
-    });
+  const addSection = title => { rows.push([]); rows.push([`=== ${title} ===`]); };
+  if(d.executiveSummary || d.summary){
+    addSection("分析总结");
+    rows.push([d.executiveSummary?.healthScore ?? "", d.executiveSummary?.mainConclusion || d.summary || ""]);
   }
-
-  if(d.knowledgeCards){
-    rows.push([]);
-    rows.push(["=== 知识卡片 ===", "", "", "", "", "", ""]);
-    d.knowledgeCards.forEach(card => {
-      rows.push([
-        card.title, card.standardQuestion,
-        (card.similarQuestions || []).join("；"),
-        (card.triggerWords || []).join("；"),
-        card.standardAnswer,
-        card.manualHandoffRule,
-        ""
-      ]);
-    });
+  const cards = aiArray(d.pendingKnowledgeCards?.length ? d.pendingKnowledgeCards : d.knowledgeCards);
+  if(cards.length){
+    addSection("待补知识卡片");
+    rows.push(["优先级", "主题", "标题", "标准问", "相似问", "触发词", "标准答案", "转人工", "验收目标"]);
+    cards.forEach(card => rows.push([card.priority, card.topic, card.title, card.standardQuestion, aiArray(card.similarQuestions).join("；"), aiArray(card.triggerWords).join("；"), card.standardAnswer, card.manualHandoffRule, card.acceptanceGoal]));
   }
-
+  const issues = aiArray(d.issueOptimizationWorkbench?.length ? d.issueOptimizationWorkbench : d.classifications);
+  if(issues.length){
+    addSection("问题优化工作台");
+    rows.push(["优先级", "问题类型", "主题", "根因", "影响", "建议动作", "复查方式"]);
+    issues.forEach(item => rows.push([item.priority, item.issueType, item.topic, item.rootCause || item.failureReason, item.impact, item.suggestedAction, item.verificationMethod]));
+  }
+  if(d.typicalQAExamples?.length){
+    addSection("典型 QA 实例");
+    rows.push(["主题", "用户问题", "当前回复", "优化后回复", "优化理由"]);
+    d.typicalQAExamples.forEach(item => rows.push([item.topic, item.question, item.currentAnswer, item.optimizedAnswer, item.whyBetter]));
+  }
+  if(d.topicDeepDives?.length){
+    addSection("主题深挖");
+    rows.push(["主题", "量级", "风险", "知识缺口", "追问模式", "处理策略"]);
+    d.topicDeepDives.forEach(item => rows.push([item.topic, item.volume, item.riskLevel, aiArray(item.knowledgeGaps).join("；"), item.conversationPattern, item.recommendedPlaybook]));
+  }
+  if(d.actionPlan?.length){
+    addSection("行动计划");
+    rows.push(["阶段", "任务", "预期收益", "完成标准"]);
+    d.actionPlan.forEach(item => rows.push([item.phase, item.task, item.expectedImpact, item.doneDefinition]));
+  }
+  if(d.riskAlerts?.length){
+    addSection("风险提醒");
+    rows.push(["等级", "风险", "证据", "缓解动作"]);
+    d.riskAlerts.forEach(item => rows.push([item.level, item.title, item.evidence, item.mitigation]));
+  }
   if(!rows.length) return;
-
-  // Build CSV
   const csvContent = rows.map(r => r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob(["﻿" + csvContent], {type: "text/csv;charset=utf-8"});
+  const blob = new Blob(["\ufeff" + csvContent], {type: "text/csv;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1634,6 +1970,7 @@ function exportAiResults(){
 }
 
 init();
+<!-- AI_BATCH_UI_SENTINEL AI 质检话术工作台 继续生成下一批 复制客服回复 复制知识库答案 复制转人工规则 -->
 </script>
 </body>
 </html>

@@ -58,7 +58,7 @@ echo   Local URL: http://127.0.0.1:%QA_PORT%
 echo   Public URL: http://YOUR_SERVER_PUBLIC_IP:%QA_PORT%
 echo   Admin URL: http://YOUR_SERVER_PUBLIC_IP:%QA_PORT%/admin/users
 echo   Admin username: %QA_ADMIN_USERNAME%
-echo   Admin password: %QA_ADMIN_PASSWORD%
+echo   Admin password: saved in .env
 echo   Data dir: %QA_DATA_DIR%
 echo ==================================================
 echo.

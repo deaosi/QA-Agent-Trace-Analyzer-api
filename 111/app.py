@@ -14,6 +14,7 @@ from functools import wraps
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+from storage import load_json as storage_load_json, save_json as storage_save_json
 
 try:
     import jieba
@@ -40,14 +41,42 @@ DEFAULT_AI_CONFIG = {
     "apiKey": "",
     "temperature": 0.3,
     "maxTokens": 4096,
+    "timeoutSeconds": 300,
 }
 
 TRACE_API = "https://agent.tanyuai.com/api/im/agent-trace/paginateV2"
 REFERER = "https://agent.tanyuai.com/v2/diagnostic-optimization/optimization-workshop"
+DEFAULT_SECRET_KEY = "change-me-before-public-deploy"
+SHOP_ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+AI_DEFAULT_ISSUE_BATCH_SIZE = 20
+AI_MAX_ISSUE_BATCH_SIZE = 200
+AI_CONNECT_TIMEOUT_SECONDS = 20
+AI_DEFAULT_READ_TIMEOUT_SECONDS = 300
+AI_MIN_READ_TIMEOUT_SECONDS = 60
+AI_MAX_READ_TIMEOUT_SECONDS = 900
+
+
+class InvalidShopId(ValueError):
+    pass
+
+
+def resolve_secret_key(environ=os.environ):
+    return environ.get("QA_SECRET_KEY", DEFAULT_SECRET_KEY)
+
+
+def warn_if_default_secret(secret):
+    if secret == DEFAULT_SECRET_KEY:
+        print("WARNING: QA_SECRET_KEY is using the development default. Set QA_SECRET_KEY before public deployment.")
+
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("QA_SECRET_KEY", "change-me-before-public-deploy")
+app.secret_key = resolve_secret_key()
 app.permanent_session_lifetime = timedelta(days=30)
+
+
+@app.errorhandler(InvalidShopId)
+def handle_invalid_shop_id(error):
+    return jsonify({"success": False, "error": str(error)}), 400
 
 
 def auth_enabled():
@@ -87,18 +116,11 @@ def require_admin(fn):
 
 
 def load_json(path, default=None):
-    try:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        pass
-    return default if default is not None else {}
+    return storage_load_json(path, default)
 
 
 def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    storage_save_json(path, data)
 
 
 def now_iso():
@@ -168,12 +190,28 @@ def login_user(username, remember=True):
     session["loginNonce"] = secrets.token_hex(8)
 
 
+def shop_file_token(shop_id):
+    token = str(shop_id or "").strip()
+    if not SHOP_ID_PATTERN.fullmatch(token):
+        raise InvalidShopId("Invalid shop ID. Use 1-128 letters, numbers, dot, dash, or underscore characters.")
+    return token
+
+
+def shop_data_path(prefix, shop_id):
+    token = shop_file_token(shop_id)
+    root = os.path.abspath(DATA_DIR)
+    path = os.path.abspath(os.path.join(root, f"{prefix}_{token}.json"))
+    if not path.startswith(root + os.sep):
+        raise InvalidShopId("Invalid shop ID path.")
+    return path
+
+
 def data_file(shop_id):
-    return os.path.join(DATA_DIR, f"traces_{shop_id}.json")
+    return shop_data_path("traces", shop_id)
 
 
 def analysis_file(shop_id):
-    return os.path.join(DATA_DIR, f"analysis_{shop_id}.json")
+    return shop_data_path("analysis", shop_id)
 
 
 def issue_status_key(shop_id, issue_id):
@@ -1678,6 +1716,14 @@ def _mask_api_key(key):
     return key[:4] + "***" + key[-4:]
 
 
+def clamp_ai_timeout_seconds(value):
+    try:
+        timeout = int(value)
+    except (TypeError, ValueError):
+        timeout = AI_DEFAULT_READ_TIMEOUT_SECONDS
+    return max(AI_MIN_READ_TIMEOUT_SECONDS, min(AI_MAX_READ_TIMEOUT_SECONDS, timeout))
+
+
 def _resolve_config(cfg):
     """Return a flat dict with the current AI config values."""
     return {
@@ -1686,6 +1732,7 @@ def _resolve_config(cfg):
         "model": cfg.get("model", "").strip(),
         "temperature": float(cfg.get("temperature", 0.3)),
         "maxTokens": int(cfg.get("maxTokens", 4096)),
+        "timeoutSeconds": clamp_ai_timeout_seconds(cfg.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS)),
     }
 
 
@@ -1697,6 +1744,7 @@ def _call_llm(system_prompt, user_text, cfg):
     model = p["model"]
     temperature = p["temperature"]
     max_tokens = p["maxTokens"]
+    timeout_seconds = p["timeoutSeconds"]
 
     if not api_key or not base_url or not model:
         return None, "未配置 API Key、Base URL 或 Model"
@@ -1736,7 +1784,7 @@ def _call_llm(system_prompt, user_text, cfg):
         }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=120)
+        resp = requests.post(url, json=payload, headers=headers, timeout=(AI_CONNECT_TIMEOUT_SECONDS, timeout_seconds))
         resp.raise_for_status()
         data = resp.json()
 
@@ -1760,6 +1808,21 @@ def _call_llm(system_prompt, user_text, cfg):
         return None, f"解析响应失败: {e}"
 
 
+def format_llm_error(err, attempt=None, issue_limit=None):
+    raw = str(err or "")
+    prefix = f"LLM 调用失败 (尝试{attempt}次): " if attempt else "LLM 调用失败: "
+    if "read timed out" in raw.lower():
+        match = re.search(r"read timeout=([0-9.]+)", raw, re.IGNORECASE)
+        timeout = match.group(1) if match else str(AI_DEFAULT_READ_TIMEOUT_SECONDS)
+        batch_hint = f"当前每批 {issue_limit} 条，" if issue_limit else ""
+        return (
+            f"{prefix}AI 接口超过 {timeout} 秒仍未返回。"
+            f"{batch_hint}建议先改成 20 条一批，或在 API 配置中把 Read Timeout(s) 调到 600/900 后重试。"
+            f"原始错误: {raw}"
+        )
+    return f"{prefix}{raw}"
+
+
 @app.route("/api/ai/config")
 @require_auth
 def ai_config_get():
@@ -1774,6 +1837,7 @@ def ai_config_get():
             "apiKeyMasked": bool(masked_key),
             "temperature": cfg.get("temperature", 0.3),
             "maxTokens": cfg.get("maxTokens", 4096),
+            "timeoutSeconds": clamp_ai_timeout_seconds(cfg.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS)),
         },
     })
 
@@ -1795,6 +1859,8 @@ def ai_config_save():
             cfg["maxTokens"] = int(data["maxTokens"])
         except (ValueError, TypeError):
             pass
+    if "timeoutSeconds" in data:
+        cfg["timeoutSeconds"] = clamp_ai_timeout_seconds(data["timeoutSeconds"])
 
     # Update baseUrl / model
     for key in ("baseUrl", "model"):
@@ -1824,6 +1890,669 @@ def ai_test():
     return jsonify({"success": True, "response": text[:200]})
 
 
+
+def _slice_list(value, limit):
+    if not isinstance(value, list):
+        return []
+    return value[:limit]
+
+
+def clamp_ai_issue_batch_limit(value):
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        limit = AI_DEFAULT_ISSUE_BATCH_SIZE
+    return max(1, min(AI_MAX_ISSUE_BATCH_SIZE, limit))
+
+
+def clamp_ai_issue_offset(value):
+    try:
+        offset = int(value)
+    except (TypeError, ValueError):
+        offset = 0
+    return max(0, offset)
+
+
+def compact_ai_context(local_analysis, issue_offset=0, issue_limit=None):
+    """Keep the local analysis rich enough for the LLM while bounding prompt size."""
+    if not isinstance(local_analysis, dict):
+        local_analysis = {}
+
+    def compact_issue(issue):
+        draft = issue.get("knowledgeCardDraft", {}) if isinstance(issue.get("knowledgeCardDraft"), dict) else {}
+        examples = issue.get("examples", []) if isinstance(issue.get("examples"), list) else []
+        return {
+            "id": issue.get("id", ""),
+            "topic": issue.get("topic", ""),
+            "issueType": issue.get("issueType", ""),
+            "priority": issue.get("priority", ""),
+            "score": issue.get("score", 0),
+            "count": issue.get("count", 0),
+            "unresolvedCount": issue.get("unresolvedCount", 0),
+            "negativeCount": issue.get("negativeCount", 0),
+            "adoptionRisk": issue.get("adoptionRisk", 0),
+            "failureReason": issue.get("failureReason", ""),
+            "reasons": _slice_list(issue.get("reasons", []), 3),
+            "suggestedAction": issue.get("suggestedAction", ""),
+            "trainingSuggestion": issue.get("trainingSuggestion", ""),
+            "status": issue.get("status", ""),
+            "knowledgeCardDraft": {
+                "title": draft.get("title", ""),
+                "standardQuestion": draft.get("standardQuestion", ""),
+                "similarQuestions": _slice_list(draft.get("similarQuestions", []), 5),
+                "triggerWords": _slice_list(draft.get("triggerWords", []), 8),
+                "answerOutline": draft.get("answerOutline", ""),
+                "standardAnswer": draft.get("standardAnswer", ""),
+                "manualHandoffRule": draft.get("manualHandoffRule", ""),
+                "applicableScene": draft.get("applicableScene", ""),
+                "notApplicableScene": draft.get("notApplicableScene", ""),
+                "acceptanceGoal": draft.get("acceptanceGoal", ""),
+            },
+            "examples": [
+                {
+                    "id": example.get("id", ""),
+                    "question": str(example.get("question", ""))[:220],
+                    "answer": str(example.get("answer", ""))[:420],
+                    "identity": example.get("identity", {}) if isinstance(example.get("identity"), dict) else {},
+                }
+                for example in examples[:3]
+                if isinstance(example, dict)
+            ],
+        }
+
+    def compact_qa(topic):
+        examples = topic.get("examples", []) if isinstance(topic.get("examples"), list) else []
+        return {
+            "topic": topic.get("topic", ""),
+            "count": topic.get("count", 0),
+            "examples": [
+                {
+                    "id": item.get("id", ""),
+                    "question": str(item.get("question", ""))[:220],
+                    "answer": str(item.get("answer", ""))[:420],
+                    "identity": item.get("identity", {}) if isinstance(item.get("identity"), dict) else {},
+                }
+                for item in examples[:3]
+                if isinstance(item, dict)
+            ],
+        }
+
+    topic_insights = local_analysis.get("topicInsights", {}) if isinstance(local_analysis.get("topicInsights"), dict) else {}
+    identity_insights = local_analysis.get("identityInsights", {}) if isinstance(local_analysis.get("identityInsights"), dict) else {}
+    all_issues = [issue for issue in _as_list(local_analysis.get("issueWorkbench")) if isinstance(issue, dict)]
+    issue_offset = clamp_ai_issue_offset(issue_offset)
+    issue_limit = clamp_ai_issue_batch_limit(issue_limit)
+    issue_batch = all_issues[issue_offset:issue_offset + issue_limit]
+    issue_next_offset = issue_offset + len(issue_batch)
+    issue_batch_info = {
+        "offset": issue_offset,
+        "limit": issue_limit,
+        "count": len(issue_batch),
+        "total": len(all_issues),
+        "nextOffset": issue_next_offset,
+        "hasMore": issue_next_offset < len(all_issues),
+    }
+    return {
+        "totalRecords": local_analysis.get("totalRecords", 0),
+        "withContent": local_analysis.get("withContent", 0),
+        "topicDistribution": _slice_list(local_analysis.get("topicDistribution", []), 12),
+        "storeDiagnosis": local_analysis.get("storeDiagnosis", {}) if isinstance(local_analysis.get("storeDiagnosis"), dict) else {},
+        "issueBatch": issue_batch_info,
+        "issueWorkbench": [compact_issue(issue) for issue in issue_batch],
+        "qaExamples": [
+            compact_qa(topic)
+            for topic in _slice_list(local_analysis.get("qaExamples", []), 8)
+            if isinstance(topic, dict)
+        ],
+        "topicInsights": {
+            "topicCount": topic_insights.get("topicCount", 0),
+            "knowledgeGapCount": topic_insights.get("knowledgeGapCount", 0),
+            "avgAdoptionRisk": topic_insights.get("avgAdoptionRisk", 0),
+            "totalIssueCount": topic_insights.get("totalIssueCount", 0),
+            "topics": _slice_list(topic_insights.get("topics", []), 8),
+            "riskTopics": _slice_list(topic_insights.get("riskTopics", []), 6),
+            "gapTopics": _slice_list(topic_insights.get("gapTopics", []), 6),
+            "keywords": _slice_list(topic_insights.get("keywords", []), 12),
+        },
+        "identityInsights": {
+            "productCoverage": identity_insights.get("productCoverage", 0),
+            "buyerCoverage": identity_insights.get("buyerCoverage", 0),
+            "productCount": identity_insights.get("productCount", 0),
+            "buyerCount": identity_insights.get("buyerCount", 0),
+            "topProducts": _slice_list(identity_insights.get("topProducts", []), 6),
+            "issueProducts": _slice_list(identity_insights.get("issueProducts", []), 6),
+            "topBuyers": _slice_list(identity_insights.get("topBuyers", []), 6),
+            "issueBuyers": _slice_list(identity_insights.get("issueBuyers", []), 6),
+        },
+        "topKeywords": _slice_list(local_analysis.get("topKeywords", []), 12),
+    }
+
+
+def build_ai_trace_samples(traces, max_samples=120):
+    samples = []
+    for record in traces:
+        if len(samples) >= max_samples:
+            break
+        if not isinstance(record, dict):
+            continue
+        question, answer = parse_conversation(record)
+        identity = compact_identity(extract_trace_identity(record))
+        samples.append({
+            "id": record.get("id", ""),
+            "topic": str(record.get("topicName", "") or "")[:80],
+            "type": str(record.get("type", "") or "")[:40],
+            "seller": str(record.get("sellerAccount", "") or "")[:80],
+            "question": str(question or "")[:260],
+            "answer": str(answer or "")[:520],
+            "identity": identity,
+        })
+    return samples
+
+
+def build_ai_analysis_prompt_bundle(traces, shop_id, local_analysis=None, issue_offset=0, issue_limit=None):
+    local_context = compact_ai_context(local_analysis or {}, issue_offset=issue_offset, issue_limit=issue_limit)
+    trace_samples = build_ai_trace_samples(traces)
+    analysis_context = {
+        "shopId": shop_id,
+        "issueBatch": local_context.get("issueBatch", {}),
+        "localAnalysis": local_context,
+        "traceSamples": trace_samples,
+    }
+    system_prompt = """You are an ecommerce AI-agent QA expert and knowledge-base operations consultant. Use localAnalysis plus traceSamples to produce a deep, actionable diagnosis for an optimization workbench.
+
+Return JSON only. Do not return Markdown. The JSON must include these fields:
+{
+  "summary": "one-sentence summary for legacy UI",
+  "recommendations": ["legacy recommendation"],
+  "classifications": [
+    {
+      "issueType": "未回复|弱回复|高风险|正常",
+      "priority": "高|中|低",
+      "topic": "issue topic",
+      "standardQuestion": "standard question",
+      "rootCause": "root cause",
+      "suggestedAction": "suggested action",
+      "count": 0
+    }
+  ],
+  "knowledgeCards": [
+    {
+      "title": "card title",
+      "standardQuestion": "standard question",
+      "similarQuestions": ["similar question"],
+      "triggerWords": ["trigger word"],
+      "standardAnswer": "standard answer",
+      "manualHandoffRule": "handoff rule"
+    }
+  ],
+  "executiveSummary": {
+    "healthScore": 0,
+    "mainConclusion": "main conclusion",
+    "topRisks": ["top risk"],
+    "quickWins": ["quick win"]
+  },
+  "pendingKnowledgeCards": [
+    {
+      "title": "pending card title",
+      "priority": "高|中|低",
+      "topic": "topic",
+      "standardQuestion": "standard question",
+      "similarQuestions": ["similar question"],
+      "triggerWords": ["trigger word"],
+      "standardAnswer": "answer ready for the knowledge base",
+      "manualHandoffRule": "handoff boundary",
+      "sourceIssueIds": ["issue id"],
+      "acceptanceGoal": "acceptance goal"
+    }
+  ],
+  "issueOptimizationWorkbench": [
+    {
+      "issueId": "issue id",
+      "priority": "高|中|低",
+      "issueType": "未回复|弱回复|高风险",
+      "topic": "topic",
+      "rootCause": "root cause",
+      "impact": "impact on adoption or conversion",
+      "suggestedAction": "action",
+      "ownerHint": "knowledge|script|handoff|product-info",
+      "verificationMethod": "how to verify",
+      "evidenceExamples": [
+        {
+          "traceId": "trace id",
+          "buyerId": "buyer id or nickname",
+          "productTitle": "product title",
+          "productId": "product id",
+          "spuId": "spu id",
+          "skuId": "sku id",
+          "question": "original user question",
+          "currentAnswer": "current agent answer"
+        }
+      ],
+      "customerServiceReply": "copy-ready customer-service reply for this issue",
+      "knowledgeBaseAnswer": "copy-ready knowledge-base answer with conditions, steps, timing, and boundaries",
+      "manualHandoffScript": "copy-ready manual handoff rule and wording",
+      "avoidWords": ["words or vague expressions to avoid"],
+      "qualityChecklist": ["quality check item"],
+      "copyReadyTemplate": "full copy-ready QA template",
+      "qaTemplate": {
+        "standardQuestion": "standard question for knowledge base",
+        "similarQuestions": ["similar question"],
+        "triggerWords": ["trigger word"],
+        "standardAnswer": "copy-ready answer",
+        "manualHandoffRule": "manual handoff boundary",
+        "applicableScene": "when to use",
+        "notApplicableScene": "when not to use",
+        "acceptanceGoal": "how to verify",
+        "customerServiceReply": "copy-ready customer-service reply",
+        "knowledgeBaseAnswer": "copy-ready knowledge-base answer",
+        "manualHandoffScript": "copy-ready manual handoff script",
+        "avoidWords": ["words to avoid"],
+        "qualityChecklist": ["check item"],
+        "copyReadyTemplate": "full template that can be copied directly"
+      }
+    }
+  ],
+  "qualityInspectionWorkbench": "same array as issueOptimizationWorkbench; each item must be usable as a quality-inspection script card",
+  "typicalQAExamples": [
+    {
+      "topic": "topic",
+      "question": "typical user question",
+      "currentAnswer": "current answer",
+      "optimizedAnswer": "optimized answer",
+      "whyBetter": "why it is better",
+      "evidenceExamples": [
+        {
+          "traceId": "trace id",
+          "buyerId": "buyer id or nickname",
+          "productTitle": "product title",
+          "question": "original user question",
+          "currentAnswer": "current answer"
+        }
+      ]
+    }
+  ],
+  "topicDeepDives": [
+    {
+      "topic": "topic",
+      "volume": 0,
+      "riskLevel": "高|中|低",
+      "knowledgeGaps": ["knowledge gap"],
+      "conversationPattern": "common follow-up pattern",
+      "recommendedPlaybook": "recommended playbook"
+    }
+  ],
+  "actionPlan": [
+    {
+      "phase": "今日|本周|复查",
+      "task": "task",
+      "expectedImpact": "expected impact",
+      "doneDefinition": "definition of done"
+    }
+  ],
+  "riskAlerts": [
+    {
+      "level": "高|中|低",
+      "title": "risk title",
+      "evidence": "evidence",
+      "mitigation": "mitigation"
+    }
+  ]
+}
+
+Rules:
+1. Prioritize localAnalysis.issueWorkbench, storeDiagnosis, qaExamples, topicInsights, and identityInsights. Do not only summarize traceSamples.
+2. pendingKnowledgeCards must be ready to enter the knowledge base, with conditions, steps, timing, and handoff boundaries.
+3. issueOptimizationWorkbench must be sorted by priority and focus on high-risk, no-reply, weak-reply, and frequent topics.
+4. typicalQAExamples must compare currentAnswer with optimizedAnswer.
+5. Keep field names in English. Use Simplified Chinese for all user-facing field values.
+6. The current batch is localAnalysis.issueBatch. Generate qualityInspectionWorkbench / issueOptimizationWorkbench for as many items in the current issueWorkbench batch as possible, up to issueBatch.limit. Do not silently stop at 10 items.
+7. If the batch is large, keep each item concise but preserve copy-ready scripts. pendingKnowledgeCards <= issueBatch.limit, typicalQAExamples <= min(issueBatch.limit, 50), topicDeepDives <= 12, actionPlan <= 8, riskAlerts <= 8. Never truncate JSON.
+8. For issueOptimizationWorkbench and typicalQAExamples, include evidenceExamples with buyer/product/trace/question/currentAnswer when available, and include customerServiceReply, knowledgeBaseAnswer, manualHandoffScript, avoidWords, qualityChecklist, copyReadyTemplate, and a copy-ready qaTemplate for every issue that needs a knowledge card."""
+    user_text = f"""请基于下面的本地分析结果和 trace 样本，生成 AI 深度分析。
+
+重点输出模块：
+- 待补知识卡片
+- 问题优化工作台
+- AI 质检话术工作台
+- 典型 QA 实例
+- 主题深挖
+- 行动计划
+- 风险提醒
+
+当前批次说明：只质检 localAnalysis.issueWorkbench 里的当前批次；如果 issueBatch.hasMore 为 true，前端会继续生成后续批次，所以本次不要试图概括未提供的后续问题。
+请为当前批次生成可直接复制使用的话术；继续生成后续批次时会复用同一结构追加到工作台。
+
+分析上下文：
+{json.dumps(analysis_context, ensure_ascii=False, indent=2)}"""
+    return {
+        "systemPrompt": system_prompt,
+        "userText": user_text,
+        "analysisContext": analysis_context,
+    }
+
+
+
+
+def _strip_json_fences(text):
+    cleaned = str(text or "").strip().lstrip("\ufeff")
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].lstrip()
+    return cleaned
+
+
+def _find_balanced_json_object(text):
+    start = text.find("{")
+    if start < 0:
+        return ""
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+    return ""
+
+
+def parse_ai_response(text):
+    """Parse JSON-ish model output into a dict."""
+    cleaned = _strip_json_fences(text)
+    candidates = [cleaned]
+    balanced = _find_balanced_json_object(cleaned)
+    if balanced and balanced not in candidates:
+        candidates.append(balanced)
+    body = cleaned.strip().rstrip(",")
+    if body.startswith('"') and ":" in body[:120]:
+        candidates.append("{" + body + "}")
+
+    errors = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            result = json.loads(candidate, strict=False)
+            if not isinstance(result, dict):
+                raise ValueError("AI JSON root must be an object")
+            return result
+        except (json.JSONDecodeError, ValueError) as exc:
+            errors.append(str(exc))
+    raise ValueError("; ".join(errors) or "empty AI response")
+
+
+def _as_list(value):
+    return value if isinstance(value, list) else []
+
+
+
+def build_ai_evidence_examples(source, limit=3):
+    examples = source.get("examples", []) if isinstance(source, dict) else []
+    rows = []
+    for example in _as_list(examples)[:limit]:
+        if not isinstance(example, dict):
+            continue
+        identity = example.get("identity", {}) if isinstance(example.get("identity"), dict) else {}
+        rows.append({
+            "traceId": identity.get("traceId") or example.get("id", ""),
+            "buyerId": identity.get("buyerId", ""),
+            "buyerIdRaw": identity.get("buyerIdRaw", identity.get("buyerId", "")),
+            "productTitle": identity.get("productTitle", ""),
+            "productId": identity.get("productId", ""),
+            "spuId": identity.get("spuId", ""),
+            "skuId": identity.get("skuId", ""),
+            "topic": example.get("topicName") or example.get("topic") or source.get("topic", ""),
+            "question": example.get("question", ""),
+            "currentAnswer": example.get("answer", ""),
+            "seller": example.get("seller", ""),
+            "type": example.get("type", ""),
+        })
+    return rows
+
+
+def build_ai_qa_template(source, fallback=None):
+    fallback = fallback if isinstance(fallback, dict) else {}
+    draft = source.get("knowledgeCardDraft", {}) if isinstance(source, dict) and isinstance(source.get("knowledgeCardDraft"), dict) else {}
+    first_example = {}
+    examples = source.get("examples", []) if isinstance(source, dict) else []
+    if examples and isinstance(examples[0], dict):
+        first_example = examples[0]
+    standard_question = (
+        draft.get("standardQuestion")
+        or fallback.get("standardQuestion")
+        or source.get("standardQuestion", "")
+        or first_example.get("question", "")
+    )
+    standard_answer = (
+        draft.get("standardAnswer")
+        or draft.get("answerOutline")
+        or fallback.get("standardAnswer")
+        or fallback.get("optimizedAnswer")
+        or fallback.get("suggestedAction")
+        or source.get("trainingSuggestion", "")
+    )
+    handoff = draft.get("manualHandoffRule") or fallback.get("manualHandoffRule") or ""
+    customer_reply = fallback.get("customerServiceReply") or standard_answer
+    knowledge_answer = fallback.get("knowledgeBaseAnswer") or standard_answer
+    handoff_script = fallback.get("manualHandoffScript") or handoff
+    copy_ready = fallback.get("copyReadyTemplate") or "\n".join(
+        line for line in [
+            f"Q:{standard_question}" if standard_question else "",
+            f"????:{customer_reply}" if customer_reply else "",
+            f"?????:{knowledge_answer}" if knowledge_answer else "",
+            f"?????:{handoff_script}" if handoff_script else "",
+        ] if line
+    )
+    return {
+        "standardQuestion": standard_question,
+        "similarQuestions": _as_list(draft.get("similarQuestions")) or _as_list(fallback.get("similarQuestions")),
+        "triggerWords": _as_list(draft.get("triggerWords")) or _as_list(fallback.get("triggerWords")),
+        "standardAnswer": standard_answer,
+        "manualHandoffRule": handoff,
+        "applicableScene": draft.get("applicableScene") or fallback.get("applicableScene") or "",
+        "notApplicableScene": draft.get("notApplicableScene") or fallback.get("notApplicableScene") or "",
+        "acceptanceGoal": draft.get("acceptanceGoal") or fallback.get("acceptanceGoal") or "",
+        "customerServiceReply": customer_reply,
+        "knowledgeBaseAnswer": knowledge_answer,
+        "manualHandoffScript": handoff_script,
+        "avoidWords": _as_list(fallback.get("avoidWords")),
+        "qualityChecklist": _as_list(fallback.get("qualityChecklist")),
+        "copyReadyTemplate": copy_ready,
+    }
+
+
+def find_local_issue_for_ai_item(item, local_issues):
+    if not isinstance(item, dict):
+        return {}
+    issue_id = item.get("issueId") or item.get("id")
+    topic = str(item.get("topic", "") or "")
+    standard_question = str(item.get("standardQuestion", "") or "")
+    for issue in local_issues:
+        if not isinstance(issue, dict):
+            continue
+        if issue_id and issue_id == issue.get("id"):
+            return issue
+    for issue in local_issues:
+        if not isinstance(issue, dict):
+            continue
+        if topic and topic == str(issue.get("topic", "") or ""):
+            return issue
+    for issue in local_issues:
+        if not isinstance(issue, dict):
+            continue
+        draft = issue.get("knowledgeCardDraft", {}) if isinstance(issue.get("knowledgeCardDraft"), dict) else {}
+        if standard_question and standard_question in (issue.get("standardQuestion"), draft.get("standardQuestion")):
+            return issue
+    return local_issues[0] if local_issues else {}
+
+def normalize_ai_result(result, local_analysis=None, batch_info=None):
+    """Backfill the deep dashboard shape when the model returns legacy fields."""
+    if not isinstance(result, dict):
+        raise ValueError("AI result must be a JSON object")
+    local_analysis = local_analysis if isinstance(local_analysis, dict) else {}
+    store = local_analysis.get("storeDiagnosis", {}) if isinstance(local_analysis.get("storeDiagnosis"), dict) else {}
+    topic_insights = local_analysis.get("topicInsights", {}) if isinstance(local_analysis.get("topicInsights"), dict) else {}
+    local_issues = [issue for issue in _as_list(local_analysis.get("issueWorkbench")) if isinstance(issue, dict)]
+
+    executive = result.get("executiveSummary") if isinstance(result.get("executiveSummary"), dict) else {}
+    result.setdefault("summary", executive.get("mainConclusion", ""))
+    result.setdefault("recommendations", [])
+    result.setdefault("classifications", [])
+    result.setdefault("knowledgeCards", [])
+
+    if not isinstance(result.get("executiveSummary"), dict):
+        result["executiveSummary"] = {
+            "healthScore": store.get("healthScore", ""),
+            "mainConclusion": result.get("summary") or "AI \u5df2\u751f\u6210\u5206\u6790\u7ed3\u8bba",
+            "topRisks": _as_list(store.get("summary"))[:3],
+            "quickWins": _as_list(result.get("recommendations"))[:3],
+            "knowledgeGapCount": topic_insights.get("knowledgeGapCount", 0),
+        }
+
+    if not _as_list(result.get("pendingKnowledgeCards")):
+        result["pendingKnowledgeCards"] = [
+            {
+                "title": card.get("title") or card.get("standardQuestion") or "\u77e5\u8bc6\u5361\u7247",
+                "priority": card.get("priority") or "\u4e2d",
+                "topic": card.get("topic") or "",
+                "standardQuestion": card.get("standardQuestion") or "",
+                "similarQuestions": _as_list(card.get("similarQuestions")),
+                "triggerWords": _as_list(card.get("triggerWords")),
+                "standardAnswer": card.get("standardAnswer") or card.get("answerOutline") or "",
+                "manualHandoffRule": card.get("manualHandoffRule") or "",
+                "sourceIssueIds": _as_list(card.get("sourceIssueIds")),
+                "acceptanceGoal": card.get("acceptanceGoal") or "\u77e5\u8bc6\u547d\u4e2d\u540e\u80fd\u8986\u76d6\u5178\u578b\u95ee\u6cd5",
+            }
+            for card in _as_list(result.get("knowledgeCards"))[:10]
+            if isinstance(card, dict)
+        ]
+
+    if not _as_list(result.get("issueOptimizationWorkbench")):
+        result["issueOptimizationWorkbench"] = [
+            {
+                "issueId": item.get("issueId") or item.get("id") or "",
+                "priority": item.get("priority") or "\u4e2d",
+                "issueType": item.get("issueType") or "\u5f85\u5224\u65ad",
+                "topic": item.get("topic") or "",
+                "rootCause": item.get("rootCause") or item.get("failureReason") or "",
+                "impact": item.get("impact") or f"\u5f71\u54cd {item.get('count', 0)} \u6761 trace",
+                "suggestedAction": item.get("suggestedAction") or item.get("trainingSuggestion") or "",
+                "ownerHint": item.get("ownerHint") or "knowledge",
+                "verificationMethod": item.get("verificationMethod") or "\u590d\u67e5\u540c\u4e3b\u9898 trace \u7684\u56de\u7b54\u547d\u4e2d\u7387",
+            }
+            for item in _as_list(result.get("classifications"))[:12]
+            if isinstance(item, dict)
+        ]
+
+    for issue in _as_list(result.get("issueOptimizationWorkbench")):
+        if not isinstance(issue, dict):
+            continue
+        local_issue = find_local_issue_for_ai_item(issue, local_issues)
+        if not _as_list(issue.get("evidenceExamples")):
+            issue["evidenceExamples"] = build_ai_evidence_examples(local_issue)
+        if not isinstance(issue.get("qaTemplate"), dict):
+            issue["qaTemplate"] = build_ai_qa_template(local_issue, issue)
+        else:
+            issue["qaTemplate"] = build_ai_qa_template(local_issue, {**issue, **issue.get("qaTemplate", {})})
+        template = issue.get("qaTemplate", {}) if isinstance(issue.get("qaTemplate"), dict) else {}
+        issue.setdefault("customerServiceReply", template.get("customerServiceReply") or template.get("standardAnswer", ""))
+        issue.setdefault("knowledgeBaseAnswer", template.get("knowledgeBaseAnswer") or template.get("standardAnswer", ""))
+        issue.setdefault("manualHandoffScript", template.get("manualHandoffScript") or template.get("manualHandoffRule", ""))
+        issue.setdefault("avoidWords", _as_list(template.get("avoidWords")))
+        issue.setdefault("qualityChecklist", _as_list(template.get("qualityChecklist")))
+        issue.setdefault("copyReadyTemplate", template.get("copyReadyTemplate") or "")
+
+    for card in _as_list(result.get("pendingKnowledgeCards")):
+        if not isinstance(card, dict):
+            continue
+        local_issue = find_local_issue_for_ai_item(card, local_issues)
+        if not _as_list(card.get("evidenceExamples")):
+            card["evidenceExamples"] = build_ai_evidence_examples(local_issue)
+        if not isinstance(card.get("qaTemplate"), dict):
+            card["qaTemplate"] = build_ai_qa_template(local_issue, card)
+
+    if not _as_list(result.get("typicalQAExamples")):
+        examples = []
+        for topic in _as_list(local_analysis.get("qaExamples"))[:6]:
+            if not isinstance(topic, dict):
+                continue
+            for item in _as_list(topic.get("examples"))[:1]:
+                if isinstance(item, dict):
+                    identity = item.get("identity", {}) if isinstance(item.get("identity"), dict) else {}
+                    examples.append({
+                        "topic": topic.get("topic", ""),
+                        "question": item.get("question", ""),
+                        "currentAnswer": item.get("answer", ""),
+                        "optimizedAnswer": "\u53ef\u57fa\u4e8e\u5f85\u8865\u77e5\u8bc6\u5361\u7247\u8865\u5145\u66f4\u5b8c\u6574\u7684\u6807\u51c6\u56de\u590d",
+                        "whyBetter": "\u8865\u5145\u6761\u4ef6\u3001\u6d41\u7a0b\u548c\u8f6c\u4eba\u5de5\u8fb9\u754c",
+                        "evidenceExamples": [{
+                            "traceId": identity.get("traceId") or item.get("id", ""),
+                            "buyerId": identity.get("buyerId", ""),
+                            "buyerIdRaw": identity.get("buyerIdRaw", identity.get("buyerId", "")),
+                            "productTitle": identity.get("productTitle", ""),
+                            "productId": identity.get("productId", ""),
+                            "spuId": identity.get("spuId", ""),
+                            "skuId": identity.get("skuId", ""),
+                            "topic": topic.get("topic", ""),
+                            "question": item.get("question", ""),
+                            "currentAnswer": item.get("answer", ""),
+                        }],
+                    })
+        result["typicalQAExamples"] = examples
+
+    if not _as_list(result.get("topicDeepDives")):
+        result["topicDeepDives"] = [
+            {
+                "topic": item.get("topic", ""),
+                "volume": item.get("count", 0),
+                "riskLevel": "\u9ad8" if item.get("adoptionRisk", 0) >= 70 else "\u4e2d",
+                "knowledgeGaps": [item.get("suggestedAction", "\u8865\u9f50\u77e5\u8bc6\u70b9")],
+                "conversationPattern": "\u9ad8\u9891\u54a8\u8be2\u548c\u8ffd\u95ee\u96c6\u4e2d\u5728\u8be5\u4e3b\u9898",
+                "recommendedPlaybook": item.get("suggestedAction", "\u4f18\u5148\u8865\u5361\u5e76\u590d\u67e5"),
+            }
+            for item in _as_list(topic_insights.get("topics"))[:8]
+            if isinstance(item, dict)
+        ]
+
+    if not _as_list(result.get("actionPlan")):
+        result["actionPlan"] = [
+            {
+                "phase": "\u5efa\u8bae",
+                "task": item,
+                "expectedImpact": "\u964d\u4f4e\u672a\u56de\u590d\u6216\u5f31\u56de\u590d\u98ce\u9669",
+                "doneDefinition": "\u8865\u5145\u540e\u590d\u67e5\u540c\u7c7b trace",
+            }
+            for item in _as_list(result.get("recommendations"))[:6]
+        ]
+
+    result.setdefault("riskAlerts", [])
+    if isinstance(batch_info, dict):
+        result["aiBatchInfo"] = batch_info
+    else:
+        result.setdefault("aiBatchInfo", {})
+    result["qualityInspectionWorkbench"] = _as_list(result.get("issueOptimizationWorkbench"))
+    return result
+
+
 @app.route("/api/ai/analyze", methods=["POST"])
 @require_auth
 def ai_analyze():
@@ -1841,115 +2570,71 @@ def ai_analyze():
     if not p["apiKey"] or not p["baseUrl"] or not p["model"]:
         return jsonify({"success": False, "error": "请先在 API 配置中设置模型参数"})
 
-    # Sample traces (max 500 to avoid token limits)
-    sampled = traces[:500]
+    local_analysis = load_json(analysis_file(shop_id), {})
+    if not local_analysis or "storeDiagnosis" not in local_analysis or "topicInsights" not in local_analysis:
+        local_analysis = run_analysis(traces, shop_id)
+        save_json(analysis_file(shop_id), local_analysis)
 
-    # Build system prompt
-    system_prompt = """你是一个电商智能体质检专家。你的任务是分析智能体与买家的对话记录，找出问题并给出优化建议。
+    issue_offset = clamp_ai_issue_offset(data.get("issueOffset", data.get("offset", 0)))
+    issue_limit = clamp_ai_issue_batch_limit(data.get("issueLimit", data.get("limit", AI_DEFAULT_ISSUE_BATCH_SIZE)))
+    prompt_bundle = build_ai_analysis_prompt_bundle(
+        traces,
+        shop_id,
+        local_analysis,
+        issue_offset=issue_offset,
+        issue_limit=issue_limit,
+    )
+    system_prompt = prompt_bundle["systemPrompt"]
+    user_text = prompt_bundle["userText"]
+    batch_info = prompt_bundle["analysisContext"].get("issueBatch", {})
 
-请按以下 JSON 格式返回结果（不要返回其他内容）：
-{
-  "summary": "整体分析总结（100字以内）",
-  "recommendations": ["建议1", "建议2", "建议3"],
-  "classifications": [
-    {
-      "issueType": "未回复|弱回复|高风险|正常",
-      "priority": "高|中|低",
-      "topic": "问题分类",
-      "standardQuestion": "标准问法",
-      "rootCause": "根本原因",
-      "suggestedAction": "建议动作",
-      "count": 出现次数
-    }
-  ],
-  "knowledgeCards": [
-    {
-      "title": "卡片标题",
-      "standardQuestion": "标准问法",
-      "similarQuestions": ["相似问法1", "相似问法2"],
-      "triggerWords": ["触发词1", "触发词2"],
-      "standardAnswer": "标准答案",
-      "manualHandoffRule": "转人工规则"
-    }
-  ]
-}
-
-注意事项：
-1. classifications 最多返回 10 条，按优先级排序
-2. knowledgeCards 最多返回 6 张，只针对有问题（非正常）的对话生成
-3. 所有字段都是中文
-4. standardAnswer 要具体可执行，包含操作步骤和时效承诺
-5. manualHandoffRule 要明确什么情况下必须转人工"""
-
-    # Build user prompt with trace samples
-    trace_samples = []
-    for i, record in enumerate(sampled[:50]):  # Use first 50 for context
-        if not isinstance(record, dict):
-            continue
-        question = record.get("question", "") or record.get("searchContent", "") or ""
-        answer = record.get("content", "") or ""
-        if isinstance(answer, list):
-            answer = "\n".join(str(c) for c in answer if isinstance(c, str))
-        topic = record.get("topicName", "") or ""
-        buyer = record.get("buyerAccount", "") or ""
-        product = ""
-        pi = record.get("productInfo", {})
-        if isinstance(pi, dict):
-            product = pi.get("spuTitle", "") or pi.get("title", "") or ""
-        trace_samples.append({
-            "index": i + 1,
-            "question": str(question)[:200],
-            "answer": str(answer)[:300],
-            "topic": str(topic)[:50],
-            "buyer": str(buyer)[:30],
-            "product": str(product)[:50],
-        })
-
-    user_text = f"""请分析以下 {len(trace_samples)} 条智能体对话记录：
-
-{json.dumps(trace_samples, ensure_ascii=False, indent=2)}
-
-请按照要求返回结构化分析结果。"""
-
-    # Retry logic: up to 2 retries on transient network errors
-    last_err = None
+    err = None
+    llm_text = ""
     for attempt in range(1, 4):
         llm_text, err = _call_llm(system_prompt, user_text, cfg)
         if err:
-            last_err = err
             if attempt < 3:
-                time.sleep(2 ** (attempt - 1))  # exponential backoff: 2s, 4s
+                time.sleep(2 ** (attempt - 1))
                 continue
             break
-        # Success
         break
 
     if err:
-        return jsonify({"success": False, "error": f"LLM 调用失败 (尝试{attempt}次): {err}"})
+        return jsonify({"success": False, "error": format_llm_error(err, attempt=attempt, issue_limit=issue_limit)})
 
-    # Parse JSON from LLM response
-    try:
-        # Try to extract JSON from the response (handle markdown code blocks)
-        cleaned = llm_text.strip()
-        if cleaned.startswith("```"):
-            # Remove markdown code fences
-            lines = cleaned.split("\n")
-            cleaned = "\n".join(lines[1:])
-            if cleaned.startswith("```"):
-                cleaned = cleaned[1:]
-            lines = cleaned.split("\n")
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines)
+    parse_error = None
+    result = None
+    for parse_attempt in range(1, 3):
+        try:
+            result = normalize_ai_result(parse_ai_response(llm_text), local_analysis, batch_info)
+            break
+        except ValueError as exc:
+            parse_error = exc
+            if parse_attempt >= 2:
+                break
+            repair_prompt = (
+                user_text
+                + "\n\n上一次输出不是可解析 JSON。请重新输出更紧凑的 JSON 对象："
+                + "不要 Markdown，不要解释文字，数组最多 6 项，必须闭合所有括号。"
+            )
+            llm_text, err = _call_llm(system_prompt, repair_prompt, cfg)
+            if err:
+                return jsonify({"success": False, "error": f"LLM 修复输出失败: {err}"})
 
-        result = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        return jsonify({"success": False, "error": f"AI 返回格式解析失败: {e}\n原始内容: {llm_text[:500]}"})
+    if result is None:
+        raw_preview = str(llm_text or "")[:800]
+        error_text = (
+            f"AI 返回格式解析失败: {parse_error}"
+            "\n建议：把 Max Tokens 调到 8192 或 12000 后重试。"
+            f"\n原始内容: {raw_preview}"
+        )
+        return jsonify({"success": False, "error": error_text})
 
     return jsonify({"success": True, "data": result})
 
 
 if __name__ == "__main__":
+    warn_if_default_secret(app.secret_key)
     host = os.environ.get("QA_HOST", "127.0.0.1")
     port = int(os.environ.get("QA_PORT", "5000"))
     print("=" * 50)

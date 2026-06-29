@@ -1,20 +1,92 @@
-"""Service Panel - Start/Stop/Restart Flask App"""
+"""Desktop control panel for the QA Agent Trace Analyzer."""
+
 import os
-import sys
+import signal
 import subprocess
+import sys
 import threading
+import time
 import tkinter as tk
-from tkinter import ttk, messagebox
+import webbrowser
 from datetime import datetime
+from tkinter import messagebox, ttk
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(BASE_DIR)
-APP_PY = os.path.join(BASE_DIR, "app.py")
-LOG_FILE = os.path.join(BASE_DIR, "server.log")
-PORT = 5000
-HOST = "127.0.0.1"
-PID_FILE = os.path.join(BASE_DIR, ".server.pid")
+WSGI_PY = os.path.join(PROJECT_DIR, "wsgi.py")
+ENV_FILE = os.path.join(PROJECT_DIR, ".env")
+PID_FILE = os.path.join(PROJECT_DIR, "server.pid")
+LOG_FILE = os.path.join(PROJECT_DIR, "server.log")
+ERR_LOG_FILE = os.path.join(PROJECT_DIR, "server.log.err")
 DEFAULT_DATA_DIR = os.path.join(PROJECT_DIR, "data")
+DEPLOY_SCRIPT = os.path.join(PROJECT_DIR, "deploy_only.bat")
+
+
+def load_env_file(path=ENV_FILE):
+    values = {}
+    if not os.path.exists(path):
+        return values
+    with open(path, "r", encoding="utf-8-sig") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"')
+    return values
+
+
+def build_runtime_config(env_values=None):
+    env_values = dict(env_values or {})
+    return {
+        "QA_PORT": env_values.get("QA_PORT") or "5000",
+        "QA_HOST": env_values.get("QA_HOST") or "0.0.0.0",
+        "QA_ADMIN_USERNAME": env_values.get("QA_ADMIN_USERNAME") or "admin",
+        "QA_ADMIN_PASSWORD": env_values.get("QA_ADMIN_PASSWORD") or "",
+        "QA_ACCESS_PASSWORD": env_values.get("QA_ACCESS_PASSWORD") or env_values.get("QA_ADMIN_PASSWORD") or "",
+        "QA_SECRET_KEY": env_values.get("QA_SECRET_KEY") or "",
+        "QA_DATA_DIR": env_values.get("QA_DATA_DIR") or DEFAULT_DATA_DIR,
+    }
+
+
+def venv_python():
+    python_exe = os.path.join(PROJECT_DIR, ".venv", "Scripts", "python.exe")
+    return python_exe if os.path.exists(python_exe) else sys.executable
+
+
+def build_waitress_command(port):
+    return [
+        venv_python(),
+        "-m",
+        "waitress",
+        f"--listen=0.0.0.0:{port}",
+        "wsgi:app",
+    ]
+
+
+def is_process_running(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def read_pid():
+    try:
+        with open(PID_FILE, "r", encoding="utf-8") as handle:
+            return int(handle.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def remove_pid_file():
+    try:
+        os.remove(PID_FILE)
+    except OSError:
+        pass
 
 
 class ServicePanel(tk.Tk):
@@ -22,84 +94,85 @@ class ServicePanel(tk.Tk):
         super().__init__()
         self.proc = None
         self.log_thread = None
+        self.env_values = {}
+        self.config = build_runtime_config({})
         self.running = False
-        self.title("服务控制面板 - QA Agent Trace Analyzer")
-        self.geometry("520x480")
-        self.resizable(False, False)
-        self.configure(bg="#f0f2f5")
-        # Ensure window is visible
-        self.attributes("-topmost", False)
+        self.title("QA Agent Trace Analyzer - 总控面板")
+        self.geometry("760x560")
+        self.minsize(720, 520)
+        self.configure(bg="#f4f6f8")
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.build_ui()
+        self.refresh_config()
         self.check_status()
-        # Force show the window
-        self.deiconify()
-        self.lift()
-        self.focus_force()
+
+    @property
+    def local_url(self):
+        return f"http://127.0.0.1:{self.config['QA_PORT']}"
 
     def build_ui(self):
-        # Title
-        title_frame = ttk.Frame(self, padding=16)
-        title_frame.pack(fill="x")
-        ttk.Label(title_frame, text="店铺智能体训练工作台", font=("Microsoft YaHei", 14, "bold"), foreground="#101828").pack()
-        ttk.Label(title_frame, text=f"http://{HOST}:{PORT}", font=("Microsoft YaHei", 9), foreground="#64748b").pack()
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(3, weight=1)
 
-        # Status
-        status_frame = ttk.LabelFrame(self, text="服务状态", padding=12)
-        status_frame.pack(fill="x", padx=16, pady=8)
+        header = ttk.Frame(self, padding=(18, 16, 18, 8))
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text="QA Agent Trace Analyzer 总控面板", font=("Microsoft YaHei", 16, "bold")).grid(row=0, column=0, sticky="w")
+        self.url_var = tk.StringVar(value="http://127.0.0.1:5000")
+        ttk.Label(header, textvariable=self.url_var, foreground="#475467").grid(row=1, column=0, sticky="w", pady=(4, 0))
+
+        status = ttk.LabelFrame(self, text="服务状态", padding=12)
+        status.grid(row=1, column=0, sticky="ew", padx=18, pady=8)
+        status.columnconfigure(1, weight=1)
+        self.status_dot = ttk.Label(status, text="●", foreground="#d92d20", font=("Arial", 14))
+        self.status_dot.grid(row=0, column=0, padx=(0, 8))
         self.status_var = tk.StringVar(value="未运行")
-        self.status_dot_label = ttk.Label(status_frame, text="●", foreground="#ef4444")
-        self.status_dot_label.pack(side="left")
-        ttk.Label(status_frame, textvariable=self.status_var, font=("Microsoft YaHei", 10)).pack(side="left", padx=6)
+        ttk.Label(status, textvariable=self.status_var, font=("Microsoft YaHei", 10, "bold")).grid(row=0, column=1, sticky="w")
+        self.config_var = tk.StringVar(value="")
+        ttk.Label(status, textvariable=self.config_var, foreground="#667085").grid(row=1, column=1, sticky="w", pady=(4, 0))
 
-        # Buttons
-        btn_frame = ttk.Frame(self, padding=8)
-        btn_frame.pack(fill="x", padx=16)
+        actions = ttk.Frame(self, padding=(18, 4, 18, 4))
+        actions.grid(row=2, column=0, sticky="ew")
+        for index in range(6):
+            actions.columnconfigure(index, weight=1)
 
-        self.start_btn = ttk.Button(btn_frame, text="▶ 启动服务", command=self.start_service)
-        self.start_btn.pack(side="left", expand=True, fill="x", padx=2)
+        self.start_btn = ttk.Button(actions, text="启动服务", command=self.start_service)
+        self.start_btn.grid(row=0, column=0, sticky="ew", padx=3, pady=3)
+        self.stop_btn = ttk.Button(actions, text="停止服务", command=self.stop_service, state="disabled")
+        self.stop_btn.grid(row=0, column=1, sticky="ew", padx=3, pady=3)
+        self.restart_btn = ttk.Button(actions, text="重启服务", command=self.restart_service, state="disabled")
+        self.restart_btn.grid(row=0, column=2, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="部署环境", command=self.run_deploy).grid(row=0, column=3, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="刷新状态", command=self.refresh_all).grid(row=0, column=4, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="打开日志", command=self.open_log_file).grid(row=0, column=5, sticky="ew", padx=3, pady=3)
 
-        self.stop_btn = ttk.Button(btn_frame, text="⏹ 停止服务", command=self.stop_service, state="disabled")
-        self.stop_btn.pack(side="left", expand=True, fill="x", padx=2)
+        ttk.Button(actions, text="工作台", command=self.open_workbench).grid(row=1, column=0, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="管理员后台", command=self.open_admin).grid(row=1, column=1, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="AI 分析", command=self.open_ai).grid(row=1, column=2, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="数据目录", command=self.open_data_dir).grid(row=1, column=3, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="编辑 .env", command=self.open_env_file).grid(row=1, column=4, sticky="ew", padx=3, pady=3)
+        ttk.Button(actions, text="项目目录", command=lambda: self.open_path(PROJECT_DIR)).grid(row=1, column=5, sticky="ew", padx=3, pady=3)
 
-        self.restart_btn = ttk.Button(btn_frame, text="🔄 重启服务", command=self.restart_service, state="disabled")
-        self.restart_btn.pack(side="left", expand=True, fill="x", padx=2)
+        log_frame = ttk.LabelFrame(self, text="运行日志", padding=8)
+        log_frame.grid(row=3, column=0, sticky="nsew", padx=18, pady=(8, 14))
+        log_frame.rowconfigure(0, weight=1)
+        log_frame.columnconfigure(0, weight=1)
+        self.log_text = tk.Text(log_frame, height=18, bg="#101828", fg="#e4e7ec", insertbackground="#e4e7ec", font=("Consolas", 9), wrap="word", state="disabled")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.log_text.configure(yscrollcommand=scroll.set)
 
-        # Open URL
-        url_btn = ttk.Button(btn_frame, text="🌐 打开网页", command=self.open_url)
-        url_btn.pack(side="left", expand=True, fill="x", padx=2)
-        url_ai_btn = ttk.Button(btn_frame, text="🤖 AI 分析", command=self.open_ai_url)
-        url_ai_btn.pack(side="left", expand=True, fill="x", padx=2)
+    def refresh_all(self):
+        self.refresh_config()
+        self.check_status()
+        self.load_log_tail()
 
-        # Log area
-        log_frame = ttk.LabelFrame(self, text="日志输出", padding=8)
-        log_frame.pack(fill="both", expand=True, padx=16, pady=8)
-
-        self.log_text = tk.Text(log_frame, height=16, font=("Consolas", 9), bg="#0f172a", fg="#d1d5db",
-                                wrap="word", state="disabled")
-        scrollbar = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        self.log_text.pack(fill="both", expand=True)
-
-        # Footer
-        footer = ttk.Frame(self, padding=4)
-        footer.pack(fill="x")
-        ttk.Label(footer, text="数据目录: " + BASE_DIR, font=("Microsoft YaHei", 8), foreground="#94a3b8").pack()
-
-    def update_status(self, running, msg=None):
-        self.running = running
-        if running:
-            self.status_var.set(msg or "运行中")
-            self.status_dot_label.configure(foreground="#22c55e")
-            self.start_btn.configure(state="disabled")
-            self.stop_btn.configure(state="normal")
-            self.restart_btn.configure(state="normal")
-        else:
-            self.status_var.set(msg or "未运行")
-            self.status_dot_label.configure(foreground="#ef4444")
-            self.start_btn.configure(state="normal")
-            self.stop_btn.configure(state="disabled")
-            self.restart_btn.configure(state="disabled")
+    def refresh_config(self):
+        self.env_values = load_env_file()
+        self.config = build_runtime_config(self.env_values)
+        self.url_var.set(self.local_url)
+        self.config_var.set(f"端口: {self.config['QA_PORT']}    数据目录: {self.config['QA_DATA_DIR']}")
 
     def append_log(self, text):
         self.log_text.configure(state="normal")
@@ -112,115 +185,146 @@ class ServicePanel(tk.Tk):
         self.log_text.delete("1.0", "end")
         self.log_text.configure(state="disabled")
 
-    def start_service(self):
-        if self.running:
-            messagebox.showwarning("提示", "服务已在运行中")
+    def load_log_tail(self):
+        if not os.path.exists(LOG_FILE):
+            return
+        try:
+            with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as handle:
+                lines = handle.readlines()[-120:]
+        except OSError as exc:
+            self.append_log(f"[WARN] 无法读取日志: {exc}")
             return
         self.clear_log()
-        self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 正在启动服务...")
+        for line in lines:
+            self.append_log(line.rstrip())
+
+    def update_status(self, running, message=None):
+        self.running = running
+        self.status_dot.configure(foreground="#12b76a" if running else "#d92d20")
+        self.status_var.set(message or ("运行中" if running else "未运行"))
+        self.start_btn.configure(state="disabled" if running else "normal")
+        self.stop_btn.configure(state="normal" if running else "disabled")
+        self.restart_btn.configure(state="normal" if running else "disabled")
+
+    def validate_ready_to_start(self):
+        missing = []
+        if not os.path.exists(ENV_FILE):
+            missing.append(".env")
+        if not os.path.exists(WSGI_PY):
+            missing.append("wsgi.py")
+        if not self.config.get("QA_SECRET_KEY"):
+            missing.append("QA_SECRET_KEY")
+        if not self.config.get("QA_ADMIN_PASSWORD"):
+            missing.append("QA_ADMIN_PASSWORD")
+        if missing:
+            messagebox.showwarning("无法启动", "缺少配置: " + ", ".join(missing) + "\n请先点击『部署环境』或编辑 .env。")
+            return False
+        return True
+
+    def start_service(self):
+        self.refresh_config()
+        if self.running:
+            messagebox.showinfo("提示", "服务已经在运行。")
+            return
+        if not self.validate_ready_to_start():
+            return
+        os.makedirs(self.config["QA_DATA_DIR"], exist_ok=True)
+        env = os.environ.copy()
+        env.update(self.config)
+        command = build_waitress_command(self.config["QA_PORT"])
         try:
-            env = os.environ.copy()
-            env.setdefault("QA_DATA_DIR", DEFAULT_DATA_DIR)
-            os.makedirs(env["QA_DATA_DIR"], exist_ok=True)
-            self.proc = subprocess.Popen(
-                [sys.executable, APP_PY],
-                cwd=BASE_DIR,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-            # Save PID
-            with open(PID_FILE, "w") as f:
-                f.write(str(self.proc.pid))
-            # Start log reader thread
-            self.log_thread = threading.Thread(target=self.read_stdout, daemon=True)
-            self.log_thread.start()
+            stdout = open(LOG_FILE, "a", encoding="utf-8", errors="replace")
+            stderr = open(ERR_LOG_FILE, "a", encoding="utf-8", errors="replace")
+            stdout.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting service: {' '.join(command)}\n")
+            stdout.flush()
+            self.proc = subprocess.Popen(command, cwd=PROJECT_DIR, env=env, stdout=stdout, stderr=stderr, text=True)
+            with open(PID_FILE, "w", encoding="utf-8") as handle:
+                handle.write(str(self.proc.pid))
             self.update_status(True, f"运行中 (PID: {self.proc.pid})")
-            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已启动，PID: {self.proc.pid}")
-            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 访问 http://{HOST}:{PORT}")
-        except Exception as e:
-            self.update_status(False, f"启动失败: {e}")
-            self.append_log(f"[ERROR] {e}")
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已启动: {self.local_url}")
+            self.log_thread = threading.Thread(target=self.watch_process, daemon=True)
+            self.log_thread.start()
+        except Exception as exc:
+            self.update_status(False, "启动失败")
+            self.append_log(f"[ERROR] 启动失败: {exc}")
+            messagebox.showerror("启动失败", str(exc))
 
     def stop_service(self):
-        if not self.running or not self.proc:
-            # Try to kill by PID file
-            self.kill_by_pid_file()
+        pid = read_pid()
+        if not pid:
+            self.update_status(False, "未运行")
             return
         try:
-            self.proc.terminate()
-            self.proc.wait(timeout=5)
-            self.update_status(False, "已停止")
-            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已停止")
-        except subprocess.TimeoutExpired:
-            self.proc.kill()
-            self.update_status(False, "已强制停止")
-            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 服务已强制停止")
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+            else:
+                os.kill(pid, signal.SIGTERM)
+                time.sleep(0.5)
+            self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 已请求停止服务 PID: {pid}")
+        except Exception as exc:
+            self.append_log(f"[WARN] 停止服务失败: {exc}")
+        remove_pid_file()
+        self.proc = None
+        self.update_status(False, "未运行")
 
     def restart_service(self):
         self.stop_service()
-        self.after(500, self.start_service)
+        self.after(700, self.start_service)
 
-    def open_url(self):
-        import webbrowser
-        webbrowser.open(f"http://{HOST}:{PORT}")
+    def run_deploy(self):
+        if not os.path.exists(DEPLOY_SCRIPT):
+            messagebox.showerror("找不到脚本", DEPLOY_SCRIPT)
+            return
+        self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 正在打开部署脚本...")
+        subprocess.Popen([DEPLOY_SCRIPT], cwd=PROJECT_DIR, shell=True)
 
-    def open_ai_url(self):
-        import webbrowser
-        webbrowser.open(f"http://{HOST}:{PORT}/?tab=ai")
-
-    def read_stdout(self):
+    def watch_process(self):
         if not self.proc:
             return
-        try:
-            for line in iter(self.proc.stdout.readline, ""):
-                if line:
-                    self.after(0, lambda l=line: self.append_log(l.rstrip()))
-        except Exception:
-            pass
-        finally:
-            self.proc.stdout.close()
-            self.update_status(False, "已停止")
-            self.proc = None
-
-    def kill_by_pid_file(self):
-        try:
-            if os.path.exists(PID_FILE):
-                with open(PID_FILE, "r") as f:
-                    pid = int(f.read().strip())
-                try:
-                    os.kill(pid, 9)
-                    self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 已强制终止进程 {pid}")
-                except ProcessLookupError:
-                    self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 进程 {pid} 不存在")
-                except Exception as e:
-                    self.append_log(f"[ERROR] 终止失败: {e}")
-                finally:
-                    os.remove(PID_FILE)
-        except Exception as e:
-            self.append_log(f"[ERROR] {e}")
-        self.update_status(False, "已停止")
+        self.proc.wait()
+        self.after(0, self.check_status)
 
     def check_status(self):
-        """Check if service is already running"""
+        pid = read_pid()
+        if pid and is_process_running(pid):
+            self.update_status(True, f"运行中 (PID: {pid})")
+        else:
+            if pid:
+                remove_pid_file()
+            self.update_status(False, "未运行")
+
+    def open_workbench(self):
+        webbrowser.open(self.local_url)
+
+    def open_admin(self):
+        webbrowser.open(self.local_url + "/admin/users")
+
+    def open_ai(self):
+        webbrowser.open(self.local_url + "/?tab=ai")
+
+    def open_env_file(self):
+        if not os.path.exists(ENV_FILE):
+            messagebox.showwarning("找不到 .env", "请先点击『部署环境』生成 .env。")
+            return
+        self.open_path(ENV_FILE)
+
+    def open_log_file(self):
+        if not os.path.exists(LOG_FILE):
+            self.append_log("日志文件还不存在。")
+            return
+        self.open_path(LOG_FILE)
+
+    def open_data_dir(self):
+        os.makedirs(self.config["QA_DATA_DIR"], exist_ok=True)
+        self.open_path(self.config["QA_DATA_DIR"])
+
+    def open_path(self, path):
         try:
-            if os.path.exists(PID_FILE):
-                with open(PID_FILE, "r") as f:
-                    pid = int(f.read().strip())
-                try:
-                    os.kill(pid, 0)  # Check if process exists
-                    self.proc = subprocess.Popen(["echo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    self.proc.pid = pid
-                    self.update_status(True, f"运行中 (PID: {pid})")
-                    self.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] 检测到已有服务运行 (PID: {pid})")
-                    return
-                except ProcessLookupError:
-                    os.remove(PID_FILE)
-        except Exception:
-            pass
-        self.update_status(False, "未运行")
+            os.startfile(path)
+        except AttributeError:
+            subprocess.Popen(["xdg-open", path])
+        except Exception as exc:
+            messagebox.showerror("打开失败", str(exc))
 
 
 if __name__ == "__main__":
