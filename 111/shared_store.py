@@ -73,6 +73,15 @@ class SharedStore:
                     updated TEXT NOT NULL DEFAULT '',
                     PRIMARY KEY (shop_id, issue_id)
                 );
+                CREATE TABLE IF NOT EXISTS issue_feedback (
+                    shop_id TEXT NOT NULL,
+                    issue_id TEXT NOT NULL,
+                    verdict TEXT NOT NULL,
+                    note TEXT NOT NULL DEFAULT '',
+                    updated_by TEXT NOT NULL DEFAULT '',
+                    updated TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (shop_id, issue_id)
+                );
                 CREATE TABLE IF NOT EXISTS ai_tasks (
                     task_id TEXT PRIMARY KEY,
                     shop_id TEXT NOT NULL,
@@ -143,6 +152,7 @@ class SharedStore:
             connection.execute("DELETE FROM traces WHERE shop_id = ?", (shop_id,))
             connection.execute("DELETE FROM analyses WHERE shop_id = ?", (shop_id,))
             connection.execute("DELETE FROM issue_status WHERE shop_id = ?", (shop_id,))
+            connection.execute("DELETE FROM issue_feedback WHERE shop_id = ?", (shop_id,))
             connection.execute("DELETE FROM ai_tasks WHERE shop_id = ?", (shop_id,))
 
     @staticmethod
@@ -420,6 +430,51 @@ class SharedStore:
                 """,
                 (shop_id, issue_id, status, now_iso()),
             )
+
+    def load_issue_feedback(self, shop_id):
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT issue_id, verdict, note, updated_by, updated
+                FROM issue_feedback
+                WHERE shop_id = ?
+                """,
+                (str(shop_id),),
+            ).fetchall()
+        return {
+            row["issue_id"]: {
+                "verdict": row["verdict"],
+                "note": row["note"],
+                "updatedBy": row["updated_by"],
+                "updatedAt": row["updated"],
+            }
+            for row in rows
+        }
+
+    def set_issue_feedback(self, shop_id, issue_id, verdict, note="", updated_by=""):
+        timestamp = now_iso()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO issue_feedback(shop_id, issue_id, verdict, note, updated_by, updated)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(shop_id, issue_id) DO UPDATE SET
+                    verdict = excluded.verdict,
+                    note = excluded.note,
+                    updated_by = excluded.updated_by,
+                    updated = excluded.updated
+                """,
+                (
+                    str(shop_id), str(issue_id), str(verdict), str(note or ""),
+                    str(updated_by or ""), timestamp,
+                ),
+            )
+        return {
+            "verdict": str(verdict),
+            "note": str(note or ""),
+            "updatedBy": str(updated_by or ""),
+            "updatedAt": timestamp,
+        }
 
     def migrate_legacy(self, data_dir, shops_file, issue_status_file, load_json):
         """Import legacy JSON once without deleting the source files."""

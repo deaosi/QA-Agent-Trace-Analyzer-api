@@ -52,6 +52,7 @@ class SharedStoreTests(unittest.TestCase):
             store.merge_traces("shop-1", [{"id": "trace-1"}], "alice")
             store.save_analysis("shop-1", {"ok": True})
             store.set_issue_status("shop-1", "issue-1", "待处理")
+            store.set_issue_feedback("shop-1", "issue-1", "correct", updated_by="alice")
 
             store.delete_shop("shop-1")
 
@@ -59,6 +60,23 @@ class SharedStoreTests(unittest.TestCase):
             self.assertEqual(store.load_traces("shop-1"), [])
             self.assertEqual(store.load_analysis("shop-1"), {})
             self.assertNotIn("shop-1:issue-1", store.load_issue_status())
+            self.assertEqual(store.load_issue_feedback("shop-1"), {})
+
+    def test_issue_feedback_is_persistent_and_updateable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SharedStore(os.path.join(tmp, "shared.sqlite3"))
+            first = store.set_issue_feedback(
+                "shop-1", "issue-1", "needs_review", note="check evidence", updated_by="alice"
+            )
+            second = store.set_issue_feedback(
+                "shop-1", "issue-1", "false_positive", note="valid reply", updated_by="bob"
+            )
+
+            loaded = store.load_issue_feedback("shop-1")["issue-1"]
+            self.assertEqual(first["verdict"], "needs_review")
+            self.assertEqual(second["verdict"], "false_positive")
+            self.assertEqual(loaded["note"], "valid reply")
+            self.assertEqual(loaded["updatedBy"], "bob")
 
     def test_migrate_legacy_json_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:

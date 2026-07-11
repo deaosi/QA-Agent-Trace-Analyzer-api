@@ -20,6 +20,15 @@ from flask import Flask, has_request_context, jsonify, redirect, render_template
 from werkzeug.security import check_password_hash, generate_password_hash
 from storage import load_json as storage_load_json, save_json as storage_save_json
 from shared_store import SharedStore
+from local_analysis_v2 import (
+    ANALYSIS_VERSION as LOCAL_ANALYSIS_VERSION,
+    calculate_health_score,
+    derive_priority,
+    evaluate_trace_quality,
+    primary_rule_family,
+    question_similarity,
+    question_tokens,
+)
 
 try:
     import jieba
@@ -1150,31 +1159,12 @@ def normalize_question_text(question):
 
 
 def classify_reply_quality(question, answer, record):
-    reasons = []
-    answer_text = str(answer or "").strip()
-    question_text = str(question or "").strip()
-    search_text = str(record.get("searchContent", "") or "")
-    combined = f"{question_text} {answer_text} {search_text}"
-
-    if not answer_text or answer_text.startswith("参考话题："):
-        reasons.append("智能体无有效回复")
-    if answer_text and len(answer_text) <= 8:
-        reasons.append("回复过短")
-    weak_hits = [pattern for pattern in WEAK_REPLY_PATTERNS if pattern in answer_text]
-    if weak_hits:
-        reasons.append("弱回复/兜底话术：" + "、".join(weak_hits[:3]))
-    if any(pattern in combined for pattern in NEGATIVE_PATTERNS):
-        reasons.append("包含负向/高风险表达")
-    if search_text.count("买家") >= 2 and len(answer_text) < 30:
-        reasons.append("用户多轮追问但回复不足")
-
-    if not reasons:
-        return "正常", []
-    if any("无有效回复" in reason for reason in reasons):
-        return "未回复", reasons
-    if any("负向" in reason for reason in reasons):
-        return "高风险", reasons
-    return "弱回复", reasons
+    evaluation = evaluate_trace_quality(
+        question,
+        answer,
+        {"searchContent": record.get("searchContent", ""), "record": record},
+    )
+    return evaluation["issueType"], evaluation["reasons"]
 
 
 def infer_issue_topic(question, record):
@@ -1327,32 +1317,84 @@ def estimate_adoption_risk(issue_type, reasons, answer, record):
 
 
 def build_issue_workbench(traces, shop_id=""):
-    groups = {}
-    for record in traces:
+    groups = []
+    sorted_traces = sorted(
+        (record for record in traces if isinstance(record, dict)),
+        key=lambda record: str(record.get("id") or record.get("traceId") or ""),
+    )
+    for record in sorted_traces:
         if not isinstance(record, dict):
             continue
         question, answer = parse_conversation(record)
         if not question:
             continue
-        issue_type, reasons = classify_reply_quality(question, answer, record)
+        evaluation = evaluate_trace_quality(
+            question,
+            answer,
+            {"searchContent": record.get("searchContent", ""), "record": record},
+        )
+        issue_type = evaluation["issueType"]
+        reasons = evaluation["reasons"]
         if issue_type == "正常":
             continue
         topic = infer_issue_topic(question, record)
-        key = f"{topic}:{normalize_question_text(question)}"
-        group = groups.setdefault(key, {
-            "id": re.sub(r"\W+", "_", key, flags=re.UNICODE)[:80],
-            "topic": topic,
-            "standardQuestion": question[:160],
-            "issueType": issue_type,
-            "count": 0,
-            "unresolvedCount": 0,
-            "negativeCount": 0,
-            "adoptionRiskTotal": 0,
-            "reasons": Counter(),
-            "questionVariants": Counter(),
-            "examples": [],
-        })
+        tokens = question_tokens(question)
+        family = primary_rule_family(evaluation)
+        group = next(
+            (
+                candidate for candidate in groups
+                if candidate["topic"] == topic
+                and candidate["ruleFamily"] == family
+                and question_similarity(tokens, candidate["questionTokens"]) >= 0.58
+            ),
+            None,
+        )
+        if group is None:
+            key = f"{topic}:{normalize_question_text(question)}"
+            group = {
+                "id": re.sub(r"\W+", "_", key, flags=re.UNICODE)[:80],
+                "topic": topic,
+                "standardQuestion": question[:160],
+                "issueType": issue_type,
+                "analysisVersion": LOCAL_ANALYSIS_VERSION,
+                "ruleFamily": family,
+                "questionTokens": set(tokens),
+                "count": 0,
+                "unresolvedCount": 0,
+                "negativeCount": 0,
+                "adoptionRiskTotal": 0,
+                "confidenceTotal": 0,
+                "confidenceMax": 0,
+                "dimensionTotals": Counter(),
+                "ruleHitCounts": Counter(),
+                "ruleHitsById": {},
+                "typeCounts": Counter(),
+                "reasons": Counter(),
+                "questionVariants": Counter(),
+                "examples": [],
+            }
+            groups.append(group)
+        else:
+            group["questionTokens"].update(tokens)
         group["count"] += 1
+        group["typeCounts"][issue_type] += 1
+        group["confidenceTotal"] += int(evaluation.get("confidence", 0) or 0)
+        group["confidenceMax"] = max(group["confidenceMax"], int(evaluation.get("confidence", 0) or 0))
+        for dimension, value in evaluation.get("qualityDimensions", {}).items():
+            group["dimensionTotals"][dimension] += int(value or 0)
+        for hit in evaluation.get("ruleHits", []):
+            rule_id = str(hit.get("ruleId", "") or "")
+            if not rule_id:
+                continue
+            group["ruleHitCounts"][rule_id] += 1
+            stored_hit = group["ruleHitsById"].setdefault(rule_id, {
+                key: value for key, value in hit.items() if key != "deductions"
+            })
+            stored_hit["count"] = group["ruleHitCounts"][rule_id]
+            evidence_samples = stored_hit.setdefault("evidenceSamples", [])
+            evidence = str(hit.get("evidence", "") or "").strip()
+            if evidence and evidence not in evidence_samples and len(evidence_samples) < 3:
+                evidence_samples.append(evidence)
         group["questionVariants"][question[:80]] += 1
         if issue_type in ("未回复", "弱回复"):
             group["unresolvedCount"] += 1
@@ -1377,10 +1419,22 @@ def build_issue_workbench(traces, shop_id=""):
             group["issueType"] = issue_type
 
     status_map = SHARED_STORE.load_issue_status()
+    feedback_map = SHARED_STORE.load_issue_feedback(shop_id) if shop_id else {}
     issues = []
-    for issue in groups.values():
-        priority, score = priority_score(
-            issue["issueType"], issue["count"], issue["unresolvedCount"], issue["negativeCount"]
+    for issue in groups:
+        confidence = round(issue["confidenceTotal"] / max(issue["count"], 1))
+        quality_dimensions = {
+            dimension: round(total / max(issue["count"], 1))
+            for dimension, total in issue["dimensionTotals"].items()
+        }
+        rule_hits = sorted(
+            issue["ruleHitsById"].values(),
+            key=lambda hit: (hit.get("severity") == "高", hit.get("weight", 0), hit.get("count", 0)),
+            reverse=True,
+        )
+        priority, score = derive_priority(
+            issue["issueType"], issue["count"], issue["unresolvedCount"], issue["negativeCount"],
+            confidence, rule_hits,
         )
         sample = issue["examples"][0] if issue["examples"] else {}
         action, suggestion = build_training_suggestion(
@@ -1391,7 +1445,12 @@ def build_issue_workbench(traces, shop_id=""):
         failure_reason = infer_failure_reason(
             issue["issueType"], [reason for reason, _ in issue["reasons"].most_common(3)], sample.get("answer", ""), sample
         )
-        adoption_risk = round(issue["adoptionRiskTotal"] / max(issue["count"], 1))
+        dimension_risk = round(
+            (100 - quality_dimensions.get("safety", 100)) * 0.45
+            + (100 - quality_dimensions.get("resolution", 100)) * 0.35
+            + (100 - quality_dimensions.get("actionability", 100)) * 0.20
+        )
+        adoption_risk = max(70 if issue["issueType"] == "高风险" else 0, dimension_risk)
         optimization_value = optimization_value_score(priority, issue["count"], issue["unresolvedCount"], adoption_risk)
         issue_id = issue["id"]
         state = status_map.get(issue_status_key(shop_id, issue_id), "待处理")
@@ -1400,6 +1459,14 @@ def build_issue_workbench(traces, shop_id=""):
             "topic": issue["topic"],
             "standardQuestion": issue["standardQuestion"],
             "issueType": issue["issueType"],
+            "analysisVersion": issue["analysisVersion"],
+            "confidence": confidence,
+            "confidenceLevel": "高" if confidence >= 85 else ("中" if confidence >= 70 else "低"),
+            "qualityDimensions": quality_dimensions,
+            "ruleHits": rule_hits,
+            "primaryRuleId": rule_hits[0].get("ruleId", "") if rule_hits else "",
+            "ruleHitCounts": dict(issue["ruleHitCounts"]),
+            "typeCounts": dict(issue["typeCounts"]),
             "priority": priority,
             "score": score,
             "count": issue["count"],
@@ -1424,6 +1491,7 @@ def build_issue_workbench(traces, shop_id=""):
                 "acceptanceGoal": "让智能体正面回答问题，减少转人工和重复追问，提升人工采纳率。",
             },
             "status": state,
+            "feedback": feedback_map.get(issue_id),
             "examples": issue["examples"],
         })
     return sorted(issues, key=lambda item: (-item["score"], -item["count"], item["topic"]))
@@ -1440,7 +1508,8 @@ def build_store_diagnosis(traces, issue_workbench):
     processed = sum(1 for issue in issue_workbench if issue.get("status") in ("已补知识", "已优化话术", "复查通过", "忽略"))
     review_count = sum(1 for issue in issue_workbench if issue.get("status") in ("已补知识", "已优化话术"))
     pending = max(issue_count - processed, 0)
-    health = max(0, 100 - high_count * 8 - unresolved * 3 - risk_avg // 2)
+    health_metrics = calculate_health_score(total, issue_workbench)
+    health = health_metrics["healthScore"]
 
     summary = []
     if high_count:
@@ -1469,6 +1538,10 @@ def build_store_diagnosis(traces, issue_workbench):
 
     return {
         "healthScore": health,
+        "analysisVersion": LOCAL_ANALYSIS_VERSION,
+        "sampleAdequate": health_metrics["sampleAdequate"],
+        "sampleLabel": health_metrics["sampleLabel"],
+        "qualityRates": health_metrics["qualityRates"],
         "totalRecords": total,
         "issueCount": issue_count,
         "highPriorityCount": high_count,
@@ -1805,6 +1878,7 @@ def run_analysis(traces, shop_id=""):
     topic_insights = build_topic_insights(traces, topic_dist, issue_workbench, top_keywords)
 
     return {
+        "analysisVersion": LOCAL_ANALYSIS_VERSION,
         "totalRecords": total,
         "withContent": with_content,
         "analyzedAt": datetime.now().isoformat(),
@@ -2119,6 +2193,43 @@ def update_issue_status():
     if analysis:
         SHARED_STORE.save_analysis(shop_id, analysis)
     return jsonify({"success": True, "status": status})
+
+
+@app.route("/api/issue-feedback", methods=["GET", "POST"])
+@require_auth
+def issue_feedback():
+    if request.method == "GET":
+        shop_id = str(request.args.get("shopId", "") or "").strip()
+        if not shop_id:
+            return jsonify({"success": False, "error": "缺少店铺 ID"}), 400
+        shop_file_token(shop_id)
+        return jsonify({"success": True, "feedback": SHARED_STORE.load_issue_feedback(shop_id)})
+
+    data = request.get_json() or {}
+    shop_id = str(data.get("shopId", "") or "").strip()
+    issue_id = str(data.get("issueId", "") or "").strip()
+    verdict = str(data.get("verdict", "") or "").strip()
+    note = str(data.get("note", "") or "").strip()[:500]
+    if not shop_id or not issue_id:
+        return jsonify({"success": False, "error": "缺少店铺或问题 ID"}), 400
+    if verdict not in {"correct", "false_positive", "needs_review"}:
+        return jsonify({"success": False, "error": "反馈类型无效"}), 400
+    shop_file_token(shop_id)
+    feedback = SHARED_STORE.set_issue_feedback(
+        shop_id,
+        issue_id,
+        verdict,
+        note=note,
+        updated_by=session.get("username", ""),
+    )
+
+    analysis = SHARED_STORE.load_analysis(shop_id)
+    for issue in analysis.get("issueWorkbench", []):
+        if issue.get("id") == issue_id:
+            issue["feedback"] = feedback
+    if analysis:
+        SHARED_STORE.save_analysis(shop_id, analysis)
+    return jsonify({"success": True, "feedback": feedback})
 
 
 @app.route("/api/overview")
