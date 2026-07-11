@@ -31,6 +31,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
 .status{font-size:12px;color:var(--muted)}.pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#eef4ff;color:#175cd3;font-size:12px;font-weight:650}
 .checkbar{display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#f8fafc}.checkbar label{display:inline-flex;align-items:center;gap:6px;color:#344054}
 input[type=checkbox]{width:14px;height:14px;accent-color:var(--primary)}.progress{display:none;margin-top:14px}.progress-track{height:7px;background:#e4e7ec;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:var(--primary);transition:width .2s}.progress-meta{display:flex;justify-content:space-between;margin-top:5px;font-size:12px;color:var(--muted)}
+.progress-error{display:none;margin-top:9px;padding:9px 10px;border:1px solid #fda29b;border-radius:6px;background:#fff5f5;color:#b42318;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.progress.has-error .progress-error{display:block}.progress.has-error .progress-bar{background:#d92d20}.progress.has-error .progress-meta{color:#b42318}
 .ai-progress-visual{border:1px solid #dbeafe;background:linear-gradient(180deg,#f8fbff,#fff);border-radius:10px;padding:12px;box-shadow:0 10px 24px rgba(22,119,255,.08)}.ai-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.ai-progress-title{font-weight:780;color:#0f172a}.ai-progress-sub{font-size:12px;color:var(--muted);margin-top:3px}.ai-progress-pct{font-size:20px;font-weight:820;color:#0958d9;line-height:1}.ai-progress-visual .progress-track{height:10px;background:#e8eef7;position:relative}.ai-progress-visual .progress-bar{position:relative;background:linear-gradient(90deg,#1677ff,#4f46e5,#14b8a6);box-shadow:0 0 14px rgba(22,119,255,.28);overflow:hidden}.ai-progress-flow::after{content:"";position:absolute;inset:0;width:46%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);transform:translateX(-120%);opacity:0}.ai-progress-visual.is-running .ai-progress-flow::after{opacity:1;animation:aiProgressFlow 1.05s linear infinite}.ai-progress-stages{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:11px}.ai-progress-stage{min-height:34px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 8px;color:#667085;font-size:12px;display:flex;align-items:center;gap:6px}.ai-progress-stage::before{content:"";width:8px;height:8px;border-radius:999px;background:#cbd5e1;box-shadow:0 0 0 3px #f2f4f7;flex:0 0 auto}.ai-progress-stage.active{border-color:#93c5fd;background:#eff6ff;color:#0958d9;font-weight:750}.ai-progress-stage.active::before{background:#1677ff;box-shadow:0 0 0 4px rgba(22,119,255,.14)}.ai-progress-stage.done{color:#027a48}.ai-progress-stage.done::before{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.14)}.ai-progress-detail-panel{display:grid;grid-template-columns:1.15fr .95fr .9fr;gap:10px;margin-top:12px}.ai-progress-detail-card{border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:10px;min-height:78px}.ai-progress-detail-label{font-size:12px;color:#667085;font-weight:750;margin-bottom:6px}.ai-progress-detail-card b{display:block;color:#0f172a;margin-bottom:5px}.ai-progress-detail-card ul{margin:0;padding-left:18px;color:#475467;line-height:1.6;font-size:12px}.ai-progress-detail-card li{margin:1px 0}.ai-progress-wait{color:#475467;font-size:12px;line-height:1.55}.ai-progress-next{color:#0958d9;font-size:12px;line-height:1.55;font-weight:700}@keyframes aiProgressFlow{from{transform:translateX(-120%)}to{transform:translateX(240%)}}
 .log{display:none;white-space:pre-wrap;margin-top:12px;max-height:220px;overflow:auto;background:#0f172a;color:#d1d5db;padding:12px;border-radius:6px;font:12px/1.6 Consolas,monospace}
 .result-card{margin-top:14px}.result-title{font-size:14px;font-weight:750;margin:0 0 8px}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:8px;background:#fbfcfe}
@@ -58,12 +59,44 @@ td{overflow-wrap:break-word;word-break:break-all}
 .issue-panel{margin-bottom:18px}.issue-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}.issue-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.issue-tools select{width:120px}.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}.badge-high{background:#fef3f2;color:#b42318}.badge-mid{background:#fffaeb;color:#b54708}.badge-low{background:#ecfdf3;color:#027a48}.issue-type{background:#eef4ff;color:#175cd3}.issue-status{background:#f2f4f7;color:#344054}.risk-high{background:#fef3f2;color:#b42318}.risk-mid{background:#fff7ed;color:#c2410c}.risk-low{background:#ecfdf3;color:#027a48}.issue-question{font-weight:750;color:#101828}.issue-meta{margin-top:4px;color:var(--muted);font-size:12px}.issue-reason{color:#7a271a;font-size:12px;margin-top:5px}.issue-suggestion{color:#344054;font-size:12px;line-height:1.5;margin-top:5px}.mini-actions{display:flex;gap:6px;flex-wrap:wrap}.mini-actions .btn{height:26px;padding:0 8px;font-size:12px}
 .qa-panel{margin-top:18px}.qa-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.qa-count{font-size:12px;color:var(--muted);font-weight:500}.qa-topic{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:#f2f4f7;color:#344054;font-size:12px;font-weight:650}.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}.pager-total{color:#475467;font-size:12px;margin-right:auto}.pager-pages{display:grid;grid-template-columns:repeat(7,32px);gap:4px}.page-btn{height:30px;min-width:32px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:#344054;font-weight:650;cursor:pointer}.page-btn:hover{border-color:var(--primary);color:var(--primary)}.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}.page-btn:disabled{cursor:not-allowed;opacity:.45;border-color:var(--line);color:var(--muted)}.page-ellipsis{height:30px;display:grid;place-items:center;color:var(--muted);font-weight:700}.pager-jump{display:flex;align-items:center;gap:6px;color:#475467;font-size:12px}.pager-jump input{width:48px;height:30px;text-align:center}.pager-size{height:30px;width:auto;min-width:92px}
 .cookie-output{min-height:92px}.muted-line{color:var(--muted);font-size:12px;margin-top:6px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}
+.shop-list-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}.shop-select-all{display:inline-flex;align-items:center;gap:6px;color:#475467;font-size:12px}.shop-select-all input{width:14px;height:14px;margin:0}.saved-shop-list{max-height:188px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#fbfcfe;margin-top:7px}.saved-shop-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid #edf0f4;cursor:pointer}.saved-shop-row:last-child{border-bottom:0}.saved-shop-row:hover{background:#f1f7fb}.saved-shop-row input{width:14px;height:14px;margin:0}.saved-shop-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#344054;font-size:12px}.saved-shop-row code{color:#667085;font:11px Consolas,"SFMono-Regular",monospace;white-space:nowrap}.shop-list-empty{padding:14px 8px;border:0;background:transparent;font-size:12px}.shop-delete-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}.shop-delete-toolbar .status{line-height:1.45}
+.cleanup-duplicate-badge{display:inline-flex;align-items:center;height:20px;margin-left:7px;padding:0 6px;border-radius:999px;background:#fff1f0;color:#b42318;font-size:11px;font-weight:700;vertical-align:middle}
 /* Tab navigation */
 .tab-nav{display:flex;gap:4px;margin-bottom:16px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:var(--shadow)}.tab-btn{flex:1;height:38px;border:none;border-radius:8px;background:transparent;color:#475467;font-weight:700;font-size:14px;cursor:pointer;transition:all .15s}.tab-btn:hover{background:#f8fafc;color:var(--primary)}.tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(22,119,255,.25)}.tab-btn[data-tab="ai"].active{background:var(--indigo);box-shadow:0 2px 8px rgba(79,70,229,.25)}.tab-btn[data-tab="ai"]:hover{background:#f2f0ff;color:var(--indigo)}.tab-panel{display:none}.tab-panel.active{display:block}
 /* AI config form */
 .ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ai-form-grid .field{min-width:0}.ai-form-grid .field.full{grid-column:1/-1}
-@media(max-width:600px){.ai-form-grid{grid-template-columns:1fr}}
+.provider-config-head{display:flex;align-items:center;gap:12px;padding:4px 0 16px;border-bottom:1px solid #e5eaf0;margin-bottom:16px}.provider-avatar{width:42px;height:42px;display:grid;place-items:center;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#667085;font-size:20px;font-weight:800}.provider-config-title{display:grid;gap:4px;flex:1;min-width:0}.provider-config-title strong{font-size:16px;color:#172b3a}.provider-config-title span{font-size:12px;color:#667085}.provider-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.provider-form-grid .field.full{grid-column:1/-1}.provider-endpoint-label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}.provider-endpoint-label>label:first-child{margin:0}.provider-endpoint-helper{margin-top:6px;color:#667085;font-size:12px;line-height:1.5}.switch-control{display:inline-flex!important;align-items:center;gap:8px;color:#667085!important;font-weight:600!important;cursor:pointer;white-space:nowrap}.switch-control input{position:absolute;opacity:0;pointer-events:none}.switch-control i{position:relative;width:38px;height:22px;border-radius:999px;background:#e4e7ec;border:1px solid #d0d5dd;transition:background .15s,border-color .15s}.switch-control i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.16);transition:transform .15s}.switch-control input:checked+i{background:#1769aa;border-color:#1769aa}.switch-control input:checked+i::after{transform:translateX(16px)}.switch-control input:focus-visible+i{box-shadow:0 0 0 3px rgba(23,105,170,.16)}.provider-config-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;margin-top:14px;border-top:1px solid #e5eaf0}.provider-config-footer .status{flex:1;line-height:1.5}
+@media(max-width:600px){.ai-form-grid,.provider-form-grid{grid-template-columns:1fr}.provider-form-grid .field.full{grid-column:auto}.provider-config-head{align-items:flex-start;flex-wrap:wrap}.provider-config-head>.btn{margin-left:54px}.provider-config-footer{align-items:stretch;flex-direction:column}.provider-config-footer .action-row{justify-content:flex-end}}
 @media(max-width:1020px){.layout{grid-template-columns:1fr}.filter-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.identity-layout{grid-template-columns:1fr 1fr}.topic-kpis,.identity-grid{grid-template-columns:repeat(3,1fr)}.issue-panel table{display:block;overflow-x:auto;white-space:nowrap}td,th{min-width:80px}}@media(max-width:700px){.metrics,.filter-grid,.grid-2,.diagnosis-grid,.diagnosis-summary,.knowledge-grid,.topic-layout,.topic-kpis,.topic-heat,.identity-grid,.identity-layout,.ai-progress-detail-panel,.ai-quality-grid{grid-template-columns:1fr}.page{padding:12px}.topbar{padding:0 14px}.top-meta{display:none}.brand span{font-size:15px}.settings-menu{right:-2px}}
+</style>
+<style>
+/* Workbench refinement: a calmer control rail and stronger task hierarchy. */
+body{background:#eef2f6;color:#17212b}
+.topbar{height:64px;background:#152b3a;border-bottom-color:#27485b;box-shadow:0 5px 16px rgba(15,35,48,.16);position:sticky;top:0;z-index:40}
+.brand{letter-spacing:.01em}.brand-mark{background:#d3a64c;color:#162a38;border-radius:7px;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.page{max-width:1520px;padding:18px 24px 30px}
+.tab-nav{background:#fff;border-color:#d8e0e8;border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.tab-btn.active{background:#1769aa;box-shadow:0 2px 8px rgba(23,105,170,.22)}
+.tab-btn[data-tab="ai"].active{background:#385b8e;box-shadow:0 2px 8px rgba(56,91,142,.22)}
+.workspace-context{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;padding:14px 16px;border:1px solid #cbd8e3;border-radius:8px;background:#f8fbfd;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.workspace-context-main{display:flex;align-items:center;gap:12px;min-width:0}.workspace-context-mark{width:36px;height:36px;display:grid;place-items:center;border-radius:7px;background:#dceaf4;color:#1769aa;font-weight:800}.workspace-context-label{font-size:11px;color:#647587;margin-bottom:3px}.workspace-context-name{font-size:16px;font-weight:800;color:#152b3a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workspace-context-meta{font-size:12px;color:#647587;margin-left:4px}.workspace-context-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.workspace-context-actions .btn{height:30px}
+.layout{grid-template-columns:248px minmax(0,1fr);gap:18px}.layout>*{min-width:0}.layout>.stack:first-child{position:sticky;top:82px;max-height:calc(100vh - 100px);min-width:0;overflow-y:auto;overflow-x:hidden;padding:0 8px 12px 0;scrollbar-gutter:stable;overscroll-behavior:contain}.layout>.stack:first-child>*{flex:0 0 auto}.layout>.stack:first-child::-webkit-scrollbar{width:6px}.layout>.stack:first-child::-webkit-scrollbar-track{background:transparent}.layout>.stack:first-child::-webkit-scrollbar-thumb{background:#b8c6d3;border-radius:4px}.layout>.stack:first-child::-webkit-scrollbar-thumb:hover{background:#8fa3b5}
+.workspace-rail{min-width:0;max-width:100%;padding:8px;border:1px solid #cbd8e3;border-radius:8px;background:#152b3a;box-shadow:0 6px 18px rgba(15,35,48,.12)}.workspace-rail-title{padding:4px 8px 8px;color:#a9c0cf;font-size:11px;font-weight:750;letter-spacing:.04em}.workspace-rail button{width:100%;height:34px;border:0;border-radius:5px;background:transparent;color:#dbe8ef;text-align:left;padding:0 10px;font:inherit;font-weight:650;cursor:pointer}.workspace-rail button:hover,.workspace-rail button:focus-visible{background:#1d3b4d;color:#fff;outline:none}.workspace-rail button+button{margin-top:2px}
+.metrics{gap:10px}.metric{border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.05)}.metric::before{width:3px;background:#1769aa}.metric:nth-child(3)::before{background:#16805c}.metric:nth-child(4)::before{background:#b96a17}
+.card{border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.05)}.card-header{background:#fbfcfd}.result-card{margin-top:16px}.result-card>.card-header{font-size:15px}
+.issue-panel table{background:#fff}.issue-panel tbody tr{transition:background .12s ease}.issue-panel tbody tr:hover{background:#f5f9fc}
+.btn-primary{background:#1769aa;border-color:#1769aa}.btn-primary:hover{background:#0d4f84;border-color:#0d4f84}.pill{background:#e5f0f7;color:#155987}
+@media(max-width:1020px){.layout{grid-template-columns:minmax(0,1fr)!important}.layout>.stack:first-child{position:static;width:100%;max-height:none;overflow:visible}.workspace-rail{display:flex;align-items:center;gap:4px;overflow-x:auto}.workspace-rail-title{padding:0 8px;white-space:nowrap}.workspace-rail button{width:auto;white-space:nowrap}.workspace-rail button+button{margin-top:0}}
+@media(max-width:700px){.page{padding:12px}.workspace-context{align-items:flex-start;flex-direction:column}.workspace-context-actions{width:100%}.workspace-context-actions .btn{flex:1}.topbar{padding:0 14px}.brand span{font-size:15px}.metrics{grid-template-columns:repeat(2,1fr)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:0!important;animation-duration:0!important}}
+@media(max-width:700px){.shop-delete-toolbar{align-items:stretch;flex-direction:column}.shop-delete-toolbar .btn{width:100%}.saved-shop-row{grid-template-columns:18px minmax(0,1fr);}.saved-shop-row code{grid-column:2;overflow:hidden;text-overflow:ellipsis;max-width:100%;}}
+@media(max-width:700px){.cleanup-toolbar,.cleanup-footer{align-items:stretch;flex-direction:column}.cleanup-search-field{width:100%}.cleanup-toolbar-actions{justify-content:space-between}.cleanup-row{grid-template-columns:20px minmax(0,1fr);gap:7px}.cleanup-row-id,.cleanup-row-source{grid-column:2}.cleanup-footer .btn{width:100%}.cleanup-intro h2{font-size:16px}}
+body.is-compact .layout{grid-template-columns:minmax(0,1fr)!important}
+body.is-compact .layout>.stack:first-child{position:static;width:100%;max-height:none;overflow:visible}
+body.is-compact .workspace-rail{display:flex;align-items:center;gap:4px;overflow-x:auto}
+body.is-compact .workspace-rail-title{padding:0 8px;white-space:nowrap}
+body.is-compact .workspace-rail button{width:auto;white-space:nowrap}
+body.is-compact .workspace-rail button+button{margin-top:0}
 </style>
 </head>
 <body>
@@ -86,7 +119,24 @@ td{overflow-wrap:break-word;word-break:break-all}
   <nav class="tab-nav" style="margin-bottom:16px">
     <button class="tab-btn active" data-tab="local" onclick="switchTab('local')" style="font-size:14px;height:40px">📊 本地分析</button>
     <button class="tab-btn" data-tab="ai" onclick="switchTab('ai')" style="font-size:14px;height:40px">🤖 AI 深度分析</button>
+    <button class="tab-btn" data-tab="cleanup" onclick="switchTab('cleanup')" style="font-size:14px;height:40px">🧹 店铺清理</button>
   </nav>
+
+  <section class="workspace-context" aria-label="当前工作店铺">
+    <div class="workspace-context-main">
+      <div class="workspace-context-mark">店</div>
+      <div>
+        <div class="workspace-context-label">当前工作店铺</div>
+        <div class="workspace-context-name" id="workspaceShopName">尚未选择店铺</div>
+      </div>
+      <span class="workspace-context-meta" id="workspaceDataState">等待选择共享店铺</span>
+    </div>
+    <div class="workspace-context-actions">
+      <button class="btn" type="button" onclick="focusShopPicker()">切换店铺</button>
+      <button class="btn btn-primary" type="button" onclick="focusFetchPanel()">抓取数据</button>
+      <button class="btn" type="button" onclick="reanalyzeCurrent()">重新分析</button>
+    </div>
+  </section>
 
   <section class="metrics">
     <div class="metric"><div class="metric-value" id="m1">0</div><div class="metric-label">已抓取 Trace</div></div>
@@ -99,6 +149,13 @@ td{overflow-wrap:break-word;word-break:break-all}
   <div class="tab-panel active" id="panel-local">
   <section class="layout">
     <aside class="stack">
+      <nav class="workspace-rail" aria-label="工作区导航">
+        <div class="workspace-rail-title">质检工作区</div>
+        <button type="button" onclick="focusWorkspaceSection('resultArea')">概览与问题</button>
+        <button type="button" onclick="focusWorkspaceSection('issueWorkbenchArea')">问题工作台</button>
+        <button type="button" onclick="focusWorkspaceSection('qaPageArea')">聊天记录</button>
+        <button type="button" onclick="focusWorkspaceSection('cookieRaw')">数据管理</button>
+      </nav>
       <section class="card">
         <div class="card-header"><span>Cookie 拼接助手</span><span id="shopStatus" class="pill">未检测</span></div>
         <div class="card-body">
@@ -132,6 +189,7 @@ td{overflow-wrap:break-word;word-break:break-all}
         <div class="card-body">
           <div class="field">
             <label>已保存店铺</label>
+            <input id="shopSearch" placeholder="搜索店铺名称或 SID" oninput="renderShopOptions()" style="margin-bottom:8px">
             <select id="shopSelect" onchange="switchShop()"><option value="">-- 选择店铺 --</option></select>
           </div>
           <div class="grid-2" style="margin-top:10px">
@@ -140,7 +198,7 @@ td{overflow-wrap:break-word;word-break:break-all}
           </div>
           <div class="action-row" style="margin-top:10px">
             <button class="btn btn-primary btn-sm" onclick="probeCurrentShop()">探测店铺</button>
-            <button class="btn btn-danger btn-sm" onclick="delShop()">删除</button>
+            <button class="btn btn-sm" onclick="autoSyncShops()">自动同步</button>
           </div>
           <div class="divider"></div>
           <div class="field">
@@ -182,7 +240,7 @@ td{overflow-wrap:break-word;word-break:break-all}
             <label><input type="checkbox" class="sendTypeCb" value="1" checked> 自动发送</label>
             <label><input type="checkbox" class="sendTypeCb" value="2" checked> 侧边栏点击</label>
             <label><input type="checkbox" class="sendTypeCb" value="3"> 编辑后发送</label>
-            <label><input type="checkbox" id="overwriteCb"> 覆盖已有数据</label>
+            <label><input type="checkbox" id="overwriteCb"> 更新同 ID 数据</label>
           </div>
           <div class="toolbar">
             <div class="action-row">
@@ -197,6 +255,7 @@ td{overflow-wrap:break-word;word-break:break-all}
           <div class="progress" id="progressWrap">
             <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
             <div class="progress-meta"><span id="progressLabel"></span><span id="progressPct"></span></div>
+            <div class="progress-error" id="progressError" role="alert" aria-live="polite"></div>
           </div>
           <div class="log" id="log"></div>
         </div>
@@ -220,22 +279,32 @@ td{overflow-wrap:break-word;word-break:break-all}
       <section class="card">
         <div class="card-header"><span>🔧 API 配置</span><span class="pill" id="aiConfigStatus">未配置</span></div>
         <div class="card-body">
+          <div class="provider-config-head">
+            <div class="provider-avatar">P</div>
+            <div class="provider-config-title"><strong>添加 AI 供应商</strong><span>配置一个兼容 OpenAI 或 Anthropic 的接口</span></div>
+            <button class="btn btn-sm" type="button" onclick="testAiConnection()">⚡ 管理与测试</button>
+          </div>
+          <div class="provider-form-grid">
+            <div class="field"><label>供应商名称</label><input id="aiProviderName" placeholder="例如：Claude 官方"></div>
+            <div class="field"><label>备注</label><input id="aiProviderNote" placeholder="例如：公司专用账号"></div>
+            <div class="field full"><label>官网链接</label><input id="aiProviderWebsite" placeholder="https://example.com（可选）"></div>
+          </div>
           <div class="ai-form-grid">
-            <div class="field full"><label>Base URL</label><input id="aiBaseUrl" placeholder="https://api.xxx.com/v1" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+            <div class="field full provider-endpoint-field"><div class="provider-endpoint-label"><label id="aiEndpointLabel">API 请求地址</label><label class="switch-control"><span>完整 URL</span><input id="aiFullUrl" type="checkbox" onchange="updateAiEndpointMode()"><i aria-hidden="true"></i></label></div><input id="aiBaseUrl" placeholder="https://your-api-endpoint.com/v1" onkeydown="if(event.key===\"Enter\")saveAiConfig()"><div class="provider-endpoint-helper" id="aiEndpointHelper">兼容 OpenAI Chat Completions 格式的服务端地址</div></div>
             <div class="field"><label>Model</label><input id="aiModel" placeholder="例如 gpt-4o, claude-sonnet-4-20250514" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
-            <div class="field"><label>API Key</label><input id="aiApiKey" type="password" placeholder="sk-..." onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
+            <div class="field"><label>API Key</label><input id="aiApiKey" type="password" placeholder="只需要填写这里，保存后不会再次显示" onkeydown="if(event.key===\"Enter\")saveAiConfig()"></div>
           </div>
           <div class="ai-form-grid" style="margin-top:10px">
             <div class="field"><label>Temperature</label><input id="aiTemperature" type="number" min="0" max="2" step="0.1" value="0.3"></div>
             <div class="field"><label>Max Tokens</label><input id="aiMaxTokens" type="number" min="1" value="4096"></div>
             <div class="field"><label>Read Timeout(s)</label><input id="aiTimeoutSeconds" type="number" min="60" max="900" step="30" value="300"></div>
           </div>
-          <div class="toolbar" style="margin-top:12px">
+          <div class="provider-config-footer">
             <div class="action-row">
-              <button class="btn btn-primary btn-sm" onclick="saveAiConfig()">保存配置</button>
-              <button class="btn btn-sm" onclick="testAiConnection()">测试连接</button>
+              <button class="btn" type="button" onclick="resetAiProviderForm()">取消</button>
+              <button class="btn btn-primary" type="button" onclick="saveAiConfig()">＋ 保存供应商</button>
             </div>
-            <span id="aiTestResult" class="status"></span>
+            <span id="aiTestResult" class="status">💡 选择供应商后，填写 API Key 等字段即可开始分析</span>
           </div>
         </div>
       </section>
@@ -307,9 +376,35 @@ td{overflow-wrap:break-word;word-break:break-all}
   </div>
   <!-- /panel-ai -->
 
+  <!-- Shop Cleanup Panel -->
+  <div class="tab-panel" id="panel-cleanup">
+    <section class="cleanup-page">
+      <section class="card cleanup-card">
+        <div class="card-header"><span>🧹 店铺清理</span><span class="pill">批量管理共享店铺</span></div>
+        <div class="card-body">
+          <div class="cleanup-intro">
+            <div class="cleanup-intro-icon">删</div>
+            <div><h2>清理不需要的店铺</h2><p>按店铺名称或 SID 搜索，勾选后批量删除。删除会同时清理该店铺的 Trace、分析结果、问题状态和 AI 任务。</p></div>
+          </div>
+          <div class="cleanup-toolbar">
+            <div class="field cleanup-search-field"><label>搜索店铺</label><input id="cleanupShopSearch" placeholder="输入店铺名称或完整 SID" oninput="renderCleanupShopList()"></div>
+            <div class="cleanup-toolbar-actions"><label class="shop-select-all"><input id="cleanupSelectAll" type="checkbox" onchange="toggleAllCleanupShops(this.checked)">全选当前结果</label><button class="btn btn-sm" onclick="selectDuplicateCleanupShops()">自动勾选重复项</button><span class="status" id="cleanupSummary">共 0 个店铺</span></div>
+          </div>
+          <div class="cleanup-list" id="cleanupShopList"><div class="empty">暂无已保存店铺</div></div>
+          <div class="cleanup-footer"><span class="status" id="cleanupSelectedHint">尚未选择店铺</span><button class="btn btn-danger" onclick="deleteSelectedCleanupShops()">删除选中店铺（<span id="cleanupSelectedCount">0</span>）</button></div>
+        </div>
+      </section>
+    </section>
+  </div>
+
 </main>
 <script>
 let currentShop = "";
+let savedShops = [];
+let allSavedShops = [];
+let selectedShopIds = new Set();
+let cleanupSelectedShopIds = new Set();
+let shopSyncTimer = null;
 let abortCtrl = null;
 let lastAnalysis = null;
 let qaPage = 1;
@@ -322,13 +417,44 @@ const QA_PAGE_SIZE = 20;
 const ISSUE_PAGE_SIZE = 20;
 const $ = id => document.getElementById(id);
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+function syncResponsiveClass(){
+  document.body.classList.toggle("is-compact", window.innerWidth <= 1020);
+}
+syncResponsiveClass();
+window.addEventListener("resize", syncResponsiveClass);
+function setWorkspaceContext(name, meta){
+  if($("workspaceShopName")) $("workspaceShopName").textContent = name || "尚未选择店铺";
+  if($("workspaceDataState")) $("workspaceDataState").textContent = meta || (name ? "共享数据工作区" : "等待选择共享店铺");
+}
+function focusWorkspaceSection(id){
+  const el = $(id);
+  if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+}
+function focusShopPicker(){
+  focusWorkspaceSection("shopSelect");
+  setTimeout(() => $("shopSelect")?.focus(), 150);
+}
+function focusFetchPanel(){ focusWorkspaceSection("goBtn"); }
 async function get(url){ const r = await fetch(url); return r.json(); }
 async function post(url,data){ const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); return r.json(); }
 function log(msg){ const e=$("log"); e.style.display="block"; e.textContent += msg + "\n"; e.scrollTop=e.scrollHeight; }
 function setProgress(pct,label){ $("progressBar").style.width=pct+"%"; $("progressPct").textContent=pct+"%"; $("progressLabel").textContent=label; }
+function clearProgressError(){
+  $("progressWrap").classList.remove("has-error");
+  $("progressError").textContent = "";
+}
+function showProgressError(message){
+  const text = String(message || "抓取失败，请查看下方日志");
+  $("progressWrap").style.display = "block";
+  $("progressWrap").classList.add("has-error");
+  $("progressError").textContent = text;
+  setProgress(100, "抓取失败");
+  $("progressPct").textContent = "错误";
+}
 function dateValue(hour, minute){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`; }
 
 async function init(){
+  syncResponsiveClass();
   $("beginTime").value = dateValue(0,0);
   $("endTime").value = dateValue(23,59);
   await loadCurrentUser();
@@ -414,11 +540,266 @@ async function saveCookie(){
 
 async function loadShops(){
   const r = await get("/api/shops");
-  const sel = $("shopSelect");
-  sel.innerHTML = '<option value="">-- 选择店铺 --</option>';
-  (r.shops || []).forEach(s => {
-    sel.innerHTML += `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || s.id)}</option>`;
+  const unique = new Map();
+  (r.shops || []).forEach(shop => {
+    if(!shop || !shop.id) return;
+    const id = String(shop.id).trim();
+    const key = id.toLowerCase();
+    const existing = unique.get(key);
+    if(!existing || (!existing.name || existing.name === existing.id) && shop.name && shop.name !== id){
+      unique.set(key, {...shop, id, name: String(shop.name || id).trim() || id});
+    }
   });
+  allSavedShops = Array.from(unique.values());
+  const visibleByName = new Map();
+  allSavedShops.forEach(shop => {
+    const nameKey = cleanupShopNameKey(shop.name || shop.id);
+    const existing = visibleByName.get(nameKey);
+    if(!existing || Number(shop.traceCount || 0) > Number(existing.traceCount || 0) || (Number(shop.traceCount || 0) === Number(existing.traceCount || 0) && Number(shop.total || 0) > Number(existing.total || 0))){
+      visibleByName.set(nameKey, shop);
+    }
+  });
+  savedShops = Array.from(visibleByName.values());
+  selectedShopIds = new Set(Array.from(selectedShopIds).filter(id => savedShops.some(shop => shop.id.toLowerCase() === id)));
+  cleanupSelectedShopIds = new Set(Array.from(cleanupSelectedShopIds).filter(id => allSavedShops.some(shop => shop.id.toLowerCase() === id)));
+  renderShopOptions();
+  renderCleanupShopList();
+  if(currentShop){
+    const selected = allSavedShops.find(shop => shop.id === currentShop);
+    setWorkspaceContext(selected?.name || currentShop, "共享店铺 · 可开始质检");
+  }
+}
+
+function filteredSavedShops(){
+  const searchEl = $("shopSearch");
+  const keyword = (searchEl ? searchEl.value : "").trim().toLowerCase();
+  return savedShops.filter(s => {
+    const id = String(s.id || "").toLowerCase();
+    const name = String(s.name || "").toLowerCase();
+    return !keyword || id.includes(keyword) || name.includes(keyword);
+  });
+}
+
+function renderShopOptions(){
+  const sel = $("shopSelect");
+  const previous = sel.value;
+  const keyword = ($("shopSearch")?.value || "").trim().toLowerCase();
+  const rows = filteredSavedShops();
+  sel.innerHTML = '<option value="">-- 选择店铺 --</option>';
+  if(!rows.length && keyword){
+    sel.innerHTML += '<option value="" disabled>-- 无匹配店铺 --</option>';
+    renderSavedShopList(rows);
+    return;
+  }
+  rows.forEach(s => {
+    const label = s.name && s.name !== s.id ? `${s.name} (${s.id})` : (s.name || s.id);
+    sel.innerHTML += `<option value="${escapeHtml(s.id)}">${escapeHtml(label)}</option>`;
+  });
+  if(previous && rows.some(s => s.id === previous)) sel.value = previous;
+  renderSavedShopList(rows);
+}
+
+function renderSavedShopList(rows){
+  const list = $("savedShopList");
+  if(!list) return;
+  const count = $("shopListSummary");
+  if(count) count.textContent = "当前显示 " + rows.length + " 个店铺";
+  if(!rows.length){
+    list.innerHTML = '<div class="empty shop-list-empty">暂无匹配店铺</div>';
+    updateSelectedShopCount();
+    return;
+  }
+  list.innerHTML = rows.map(shop => {
+    const id = String(shop.id || "");
+    const key = id.toLowerCase();
+    const checked = selectedShopIds.has(key) ? " checked" : "";
+    const label = String(shop.name || id);
+    return '<label class="saved-shop-row"><input type="checkbox" data-shop-select-id="' + escapeHtml(id) + '"' + checked + ' onchange="toggleShopSelection(this)"><span class="saved-shop-name">' + escapeHtml(label) + '</span><code>' + escapeHtml(id) + '</code></label>';
+  }).join("");
+  const allVisibleSelected = rows.length > 0 && rows.every(shop => selectedShopIds.has(String(shop.id).toLowerCase()));
+  if($("shopSelectAll")) $("shopSelectAll").checked = allVisibleSelected;
+  updateSelectedShopCount();
+}
+
+function toggleShopSelection(input){
+  const id = String(input.getAttribute("data-shop-select-id") || "").trim();
+  if(!id) return;
+  const key = id.toLowerCase();
+  if(input.checked) selectedShopIds.add(key);
+  else selectedShopIds.delete(key);
+  updateSelectedShopCount();
+  const rows = filteredSavedShops();
+  if($("shopSelectAll")) $("shopSelectAll").checked = rows.length > 0 && rows.every(shop => selectedShopIds.has(String(shop.id).toLowerCase()));
+}
+
+function toggleAllVisibleShops(checked){
+  filteredSavedShops().forEach(shop => {
+    const key = String(shop.id || "").toLowerCase();
+    if(checked) selectedShopIds.add(key);
+    else selectedShopIds.delete(key);
+  });
+  renderSavedShopList(filteredSavedShops());
+}
+
+function updateSelectedShopCount(){
+  if($("selectedShopCount")) $("selectedShopCount").textContent = selectedShopIds.size;
+}
+
+async function deleteSelectedShops(){
+  const selected = savedShops.filter(shop => selectedShopIds.has(String(shop.id).toLowerCase()));
+  if(!selected.length) return alert("请先勾选要删除的店铺");
+  const preview = selected.slice(0, 5).map(shop => String(shop.name || shop.id) + " (" + shop.id + ")").join("\n");
+  const suffix = selected.length > 5 ? "\n以及其他 " + (selected.length - 5) + " 个店铺" : "";
+  if(!confirm("确认删除选中的 " + selected.length + " 个店铺？\n" + preview + suffix + "\n\n对应的 Trace、分析和 AI 任务也会被清理。")) return;
+  const response = await post("/api/delete-shops", {shopIds: selected.map(shop => shop.id)});
+  if(!response.success) return alert(response.error || "删除失败");
+  const deletedKeys = new Set((response.deleted || []).map(id => String(id).toLowerCase()));
+  selectedShopIds = new Set(Array.from(selectedShopIds).filter(id => !deletedKeys.has(id)));
+  if(deletedKeys.has(String(currentShop).toLowerCase())){
+    currentShop = "";
+    $("shopId").value = "";
+    $("resultBody").innerHTML = '<div class="empty">数据已删除</div>';
+  }
+  $("batchStatus").textContent = "已删除 " + (response.count || selected.length) + " 个店铺";
+  await loadShops();
+  await refresh();
+}
+
+function filteredCleanupShops(){
+  const keyword = ($("cleanupShopSearch")?.value || "").trim().toLowerCase();
+  return allSavedShops.filter(shop => {
+    const name = String(shop.name || "").toLowerCase();
+    const id = String(shop.id || "").toLowerCase();
+    return !keyword || name.includes(keyword) || id.includes(keyword);
+  });
+}
+
+function cleanupShopNameKey(name){
+  return String(name || "").replace(/\s+/g, "").toLowerCase();
+}
+
+function cleanupShopGroups(rows){
+  const groups = new Map();
+  rows.forEach(shop => {
+    const key = cleanupShopNameKey(shop.name || shop.id);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(shop);
+  });
+  return groups;
+}
+
+function renderCleanupShopList(){
+  const list = $("cleanupShopList");
+  if(!list) return;
+  const rows = filteredCleanupShops();
+  const duplicateGroups = Array.from(cleanupShopGroups(rows).values()).filter(group => group.length > 1);
+  if($("cleanupSummary")) $("cleanupSummary").textContent = "当前显示 " + rows.length + " 个店铺 · " + duplicateGroups.length + " 组同名重复";
+  if(!rows.length){
+    list.innerHTML = '<div class="empty cleanup-empty">暂无匹配店铺</div>';
+    updateCleanupSelectionUi([]);
+    return;
+  }
+  const groupCounts = new Map();
+  duplicateGroups.forEach(group => group.forEach(shop => groupCounts.set(String(shop.id).toLowerCase(), group.length)));
+  list.innerHTML = '<div class="cleanup-row cleanup-row-header"><span></span><b>店铺名称</b><b>SID</b><b>来源</b></div>' + rows.map(shop => {
+    const id = String(shop.id || "");
+    const key = id.toLowerCase();
+    const checked = cleanupSelectedShopIds.has(key) ? " checked" : "";
+    const duplicateBadge = groupCounts.has(key) ? '<span class="cleanup-duplicate-badge">同名 ' + groupCounts.get(key) + ' 个</span>' : "";
+    return '<label class="cleanup-row"><input type="checkbox" data-cleanup-shop-id="' + escapeHtml(id) + '"' + checked + ' onchange="toggleCleanupShop(this)"><span class="cleanup-row-name">' + escapeHtml(shop.name || id) + duplicateBadge + '</span><code class="cleanup-row-id">' + escapeHtml(id) + '</code><span class="cleanup-row-source">' + escapeHtml(shop.source || "共享数据") + '</span></label>';
+  }).join("");
+  updateCleanupSelectionUi(rows);
+}
+
+function updateCleanupSelectionUi(rows){
+  const allSelected = rows.length > 0 && rows.every(shop => cleanupSelectedShopIds.has(String(shop.id).toLowerCase()));
+  if($("cleanupSelectAll")) $("cleanupSelectAll").checked = allSelected;
+  if($("cleanupSelectedCount")) $("cleanupSelectedCount").textContent = cleanupSelectedShopIds.size;
+  if($("cleanupSelectedHint")) $("cleanupSelectedHint").textContent = cleanupSelectedShopIds.size ? "已选择 " + cleanupSelectedShopIds.size + " 个店铺" : "尚未选择店铺";
+}
+
+function toggleCleanupShop(input){
+  const id = String(input.getAttribute("data-cleanup-shop-id") || "").trim();
+  if(!id) return;
+  const key = id.toLowerCase();
+  if(input.checked) cleanupSelectedShopIds.add(key);
+  else cleanupSelectedShopIds.delete(key);
+  updateCleanupSelectionUi(filteredCleanupShops());
+}
+
+function toggleAllCleanupShops(checked){
+  filteredCleanupShops().forEach(shop => {
+    const key = String(shop.id || "").toLowerCase();
+    if(checked) cleanupSelectedShopIds.add(key);
+    else cleanupSelectedShopIds.delete(key);
+  });
+  renderCleanupShopList();
+}
+
+function selectDuplicateCleanupShops(){
+  const groups = cleanupShopGroups(allSavedShops);
+  let duplicateCount = 0;
+  groups.forEach(group => {
+    if(group.length < 2) return;
+    const ranked = group.slice().sort((a, b) => {
+      const totalDiff = Number(b.total || 0) - Number(a.total || 0);
+      return totalDiff || String(a.id).localeCompare(String(b.id));
+    });
+    ranked.slice(1).forEach(shop => {
+      cleanupSelectedShopIds.add(String(shop.id).toLowerCase());
+      duplicateCount += 1;
+    });
+  });
+  renderCleanupShopList();
+  if($("cleanupSelectedHint")) $("cleanupSelectedHint").textContent = duplicateCount ? "已自动勾选 " + duplicateCount + " 个重复店铺，默认保留每组数据量最多的一条" : "未发现同名重复店铺";
+}
+
+async function deleteSelectedCleanupShops(){
+  const selected = allSavedShops.filter(shop => cleanupSelectedShopIds.has(String(shop.id).toLowerCase()));
+  if(!selected.length) return alert("请先勾选要删除的店铺");
+  const preview = selected.slice(0, 8).map(shop => String(shop.name || shop.id) + " (" + shop.id + ")").join("\n");
+  const suffix = selected.length > 8 ? "\n以及其他 " + (selected.length - 8) + " 个店铺" : "";
+  if(!confirm("确认删除选中的 " + selected.length + " 个店铺？\n" + preview + suffix + "\n\nTrace、分析结果和 AI 任务也会被清理。")) return;
+  const response = await post("/api/delete-shops", {shopIds: selected.map(shop => shop.id)});
+  if(!response.success) return alert(response.error || "删除失败");
+  const deletedKeys = new Set((response.deleted || []).map(id => String(id).toLowerCase()));
+  cleanupSelectedShopIds = new Set(Array.from(cleanupSelectedShopIds).filter(id => !deletedKeys.has(id)));
+  selectedShopIds = new Set(Array.from(selectedShopIds).filter(id => !deletedKeys.has(id)));
+  if(deletedKeys.has(String(currentShop).toLowerCase())){
+    currentShop = "";
+    $("shopId").value = "";
+    $("resultBody").innerHTML = '<div class="empty">数据已删除</div>';
+    setWorkspaceContext("", "等待选择共享店铺");
+  }
+  $("cleanupSelectedHint").textContent = "已删除 " + (response.count || selected.length) + " 个店铺";
+  await loadShops();
+  await refresh();
+}
+
+async function autoSyncShops(){
+  if(shopSyncTimer) return;
+  $("batchStatus").textContent = "正在打开浏览器，请登录并进入知识库页面...";
+  const r = await post("/api/auto-sync-shops", {timeoutSeconds: 180});
+  if(!r.success){
+    $("batchStatus").textContent = r.error || "自动同步启动失败";
+    return;
+  }
+  shopSyncTimer = setInterval(pollShopSyncStatus, 2000);
+  await pollShopSyncStatus();
+}
+
+async function pollShopSyncStatus(){
+  const r = await get("/api/auto-sync-shops/status");
+  const state = r.state || {};
+  $("batchStatus").textContent = state.message || "自动同步中...";
+  if(!state.running){
+    clearInterval(shopSyncTimer);
+    shopSyncTimer = null;
+    await loadShops();
+    const cookieState = await get("/api/cookie-status");
+    $("shopStatus").textContent = cookieState.hasCookie ? "Cookie 已保存" : "未配置";
+    if (cookieState.hasCookie) $("cookie").placeholder = "已保存，不需要重复填写";
+  }
 }
 
 async function switchShop(){
@@ -428,9 +809,11 @@ async function switchShop(){
   $("shopId").value = sid;
   const selected = $("shopSelect").selectedOptions[0];
   $("m4").textContent = selected ? selected.textContent : sid;
+  setWorkspaceContext(selected ? selected.textContent : sid, "共享店铺 · 正在加载数据");
   await post("/api/set-shop",{shopId:sid});
   await refresh();
   await loadExistingAnalysis();
+  setWorkspaceContext(selected ? selected.textContent : sid, "共享店铺 · 数据已就绪");
 }
 
 async function probeCurrentShop(){
@@ -439,7 +822,7 @@ async function probeCurrentShop(){
   $("batchStatus").textContent = "探测中...";
   const r = await post("/api/probe-shop",{shopId:sid, cookie:$("cookie").value.trim()});
   $("batchStatus").textContent = r.success ? `${r.shopName || sid}，共 ${r.total || 0} 条` : (r.error || "探测失败");
-  if(r.success){ currentShop = sid; $("m4").textContent = r.shopName || sid; await loadShops(); await refresh(); }
+  if(r.success){ currentShop = sid; $("m4").textContent = r.shopName || sid; setWorkspaceContext(r.shopName || sid, "共享店铺 · 已保存"); await loadShops(); await refresh(); }
 }
 
 async function delShop(){
@@ -467,10 +850,10 @@ async function batchProbe(){
   await loadShops();
 }
 
-function resetBtn(){
+function resetBtn(options={}){
   $("goBtn").style.display="inline-flex";
   $("stopBtn").style.display="none";
-  $("progressWrap").style.display="none";
+  if(options.hideProgress !== false) $("progressWrap").style.display="none";
   abortCtrl = null;
 }
 
@@ -526,17 +909,20 @@ async function go(){
   if(!sid) return alert("请选择或输入店铺 ID");
   currentShop = sid;
   $("shopId").value = sid;
+  setWorkspaceContext(sid, "共享店铺 · 正在抓取");
   $("goBtn").style.display="none";
   $("stopBtn").style.display="inline-flex";
   $("progressWrap").style.display="block";
+  clearProgressError();
   $("log").style.display="block";
   $("log").textContent="";
   $("resultBody").innerHTML='<div class="empty">正在处理...</div>';
   setProgress(10, "正在抓取数据...");
   log(`=== 店铺: ${sid} ===`);
 
-  const cookie = $("cookie").value.trim();
-  if(cookie) await post("/api/save-cookie",{cookie});
+  try {
+    const cookie = $("cookie").value.trim();
+    if(cookie) await post("/api/save-cookie",{cookie});
 
   abortCtrl = new AbortController();
   const f = await post("/api/fetch", {
@@ -559,19 +945,46 @@ async function go(){
     else if(l.status === "error") log(`[ERR] ${l.msg}`);
     else log(`[EMPTY] 第${l.page}页`);
   });
-  if(!f.success){ resetBtn(); return; }
+  const fetchError = (f.log || []).find(item => item.status === "error");
+  if(!f.success || fetchError){
+    const message = fetchError?.msg || f.error || "抓取失败，请检查 Cookie 和接口返回信息";
+    log(`[ERR] ${message}`);
+    showProgressError(message);
+    setWorkspaceContext(sid, "共享店铺 · 抓取失败");
+    resetBtn({hideProgress:false});
+    return;
+  }
   log(`>> 新增 ${f.totalFetched || 0} 条，累计 ${f.totalStored || 0} 条`);
+  setWorkspaceContext(f.shopName || sid, `共享数据 · 本次新增 ${f.totalFetched || 0} 条`);
   if(f.shopName){ $("m4").textContent = f.shopName; await loadShops(); }
-  if(!f.totalStored){ $("resultBody").innerHTML='<div class="empty">没有匹配数据</div>'; resetBtn(); return; }
+  if(!f.totalStored){
+    $("resultBody").innerHTML='<div class="empty">没有匹配数据</div>';
+    showProgressError("没有抓取到匹配数据，请调整时间范围、筛选条件或检查店铺 Cookie");
+    resetBtn({hideProgress:false});
+    return;
+  }
 
   setProgress(55, "正在分析话题...");
   const a = await post("/api/analyze",{shopId:sid});
-  if(!a.success || a.data?.error){ log(`[ERR] ${a.data?.error || a.error || "分析失败"}`); resetBtn(); return; }
+  if(!a.success || a.data?.error){
+    const message = a.data?.error || a.error || "本地分析失败";
+    log(`[ERR] ${message}`);
+    showProgressError(message);
+    resetBtn({hideProgress:false});
+    return;
+  }
   setProgress(90, "正在生成结果...");
   renderAnalysis(a.data);
   await refresh();
   setProgress(100, "完成");
   resetBtn();
+  } catch(e) {
+    const message = e?.message || "请求失败，请检查网络、Cookie 或服务状态";
+    log(`[ERR] ${message}`);
+    showProgressError(message);
+    setWorkspaceContext(sid, "共享店铺 · 抓取失败");
+    resetBtn({hideProgress:false});
+  }
 }
 
 function renderAnalysis(d){
@@ -1270,6 +1683,10 @@ async function exportChat(){
 let aiAbortCtrl = null;
 let aiLastResult = null;
 let aiProgressTicker = null;
+let aiPollTimer = null;
+let aiActiveTaskId = "";
+let aiTaskAppend = false;
+let aiPollCancelled = false;
 let aiProgressStartedAt = 0;
 let aiVisualPct = 0;
 let aiProgressCurrentLabel = "";
@@ -1285,6 +1702,7 @@ async function switchTab(tab){
   if(tab === "ai" && !window._aiLoaded){
     window._aiLoaded = true;
     await loadAiConfig();
+    await restoreLatestAiTask();
   }
 }
 
@@ -1294,8 +1712,13 @@ async function loadAiConfig(){
     if(!r.success) return;
     const cfg = r.config;
 
+    $("aiProviderName").value = cfg.providerName || "";
+    $("aiProviderNote").value = cfg.providerNote || "";
+    $("aiProviderWebsite").value = cfg.providerWebsite || "";
     $("aiBaseUrl").value = cfg.baseUrl || "";
     $("aiModel").value = cfg.model || "";
+    $("aiFullUrl").checked = !!cfg.fullUrl;
+    updateAiEndpointMode();
     $("aiApiKey").value = ""; // always blank for security
     $("aiApiKey").placeholder = cfg.apiKeyMasked ? "已配置" : "sk-...";
     $("aiTemperature").value = cfg.temperature || 0.3;
@@ -1312,6 +1735,7 @@ async function saveAiConfig(){
   const baseUrl = $("aiBaseUrl").value.trim();
   const model = $("aiModel").value.trim();
   const apiKey = $("aiApiKey").value.trim();
+  const fullUrl = $("aiFullUrl").checked;
   const temperature = parseFloat($("aiTemperature").value) || 0.3;
   const maxTokens = parseInt($("aiMaxTokens").value) || 4096;
   const timeoutSeconds = parseInt($("aiTimeoutSeconds").value) || 300;
@@ -1322,8 +1746,12 @@ async function saveAiConfig(){
   }
 
   const payload = {
+    providerName: $("aiProviderName").value.trim(),
+    providerNote: $("aiProviderNote").value.trim(),
+    providerWebsite: $("aiProviderWebsite").value.trim(),
     baseUrl: baseUrl,
     model: model,
+    fullUrl: fullUrl,
     temperature: temperature,
     maxTokens: maxTokens,
     timeoutSeconds: timeoutSeconds,
@@ -1340,6 +1768,26 @@ async function saveAiConfig(){
   } else {
     alert("保存失败: " + (r.error || "未知错误"));
   }
+}
+
+function updateAiEndpointMode(){
+  const fullUrl = $("aiFullUrl")?.checked;
+  if($("aiEndpointLabel")) $("aiEndpointLabel").textContent = fullUrl ? "API 请求地址（完整 URL）" : "API 请求地址";
+  if($("aiEndpointHelper")) $("aiEndpointHelper").textContent = fullUrl
+    ? "已开启完整 URL，系统会直接请求该地址，不再自动追加路径"
+    : "兼容 OpenAI Chat Completions 格式的服务端地址，系统会自动追加请求路径";
+}
+
+function resetAiProviderForm(){
+  $("aiProviderName").value = "";
+  $("aiProviderNote").value = "";
+  $("aiProviderWebsite").value = "";
+  $("aiBaseUrl").value = "";
+  $("aiModel").value = "";
+  $("aiApiKey").value = "";
+  $("aiFullUrl").checked = false;
+  updateAiEndpointMode();
+  $("aiTestResult").textContent = "💡 选择供应商后，填写 API Key 等字段即可开始分析";
 }
 
 async function testAiConnection(){
@@ -1470,12 +1918,6 @@ function startAiProgressTicker(){
   aiProgressCurrentLabel = "正在准备分析...";
   $("aiProgressWrap").classList.add("is-running");
   updateAiProgressVisual(6, aiProgressCurrentLabel);
-  aiProgressTicker = setInterval(() => {
-    const elapsed = Date.now() - aiProgressStartedAt;
-    const cap = elapsed > 45000 ? 88 : elapsed > 22000 ? 80 : elapsed > 9000 ? 68 : 54;
-    const nextPct = Math.min(cap, aiVisualPct + (aiVisualPct < 40 ? 3 : 1));
-    updateAiProgressVisual(nextPct, aiProgressCurrentLabel);
-  }, 900);
 }
 
 function stopAiProgressTicker(finalPct, finalLabel){
@@ -1611,6 +2053,150 @@ function clearAiResults(){
   stopAiProgressTicker(0, "");
   $("aiProgressWrap").style.display = "none";
   $("aiElapsedText").textContent = "";
+}
+
+function saveAiTaskId(shopId, taskId){
+  try { localStorage.setItem("qa-ai-task:" + shopId, taskId); } catch(e) {}
+}
+
+function clearAiTaskId(shopId){
+  try { localStorage.removeItem("qa-ai-task:" + shopId); } catch(e) {}
+}
+
+function updateAiTaskProgress(task){
+  const total = Number(task.total || 0);
+  const generated = Number(task.generated || 0);
+  const suffix = total ? "（已生成 " + generated + "/" + total + " 条）" : "";
+  updateAiProgressVisual(Number(task.progress || 0), (task.stage || "正在分析") + suffix);
+  $("aiRunStatus").textContent = task.status === "running" ? (task.stage || "后台分析中") : (task.stage || "");
+}
+
+async function pollAiTask(taskId){
+  if(!taskId || aiActiveTaskId !== taskId || aiPollCancelled) return;
+  try {
+    const response = await get("/api/ai/tasks/" + encodeURIComponent(taskId));
+    if(!response.success) throw new Error(response.error || "无法读取任务状态");
+    const task = response.task || {};
+    updateAiTaskProgress(task);
+    if(task.status === "queued" || task.status === "running"){
+      aiPollTimer = setTimeout(() => pollAiTask(taskId), 1200);
+      return;
+    }
+
+    if(task.status === "succeeded"){
+      const info = aiBatchInfo(task.result);
+      aiLastResult = aiTaskAppend ? mergeAiAnalysisResult(aiLastResult, task.result) : task.result;
+      renderAiResults(aiLastResult);
+      aiLog("[OK] batch done: " + ((info.offset || 0) + 1) + "-" + (info.nextOffset || 0) + " / " + (info.total || 0) + (task.stage === "已使用缓存结果" ? "（缓存）" : ""));
+      stopAiProgressTicker(100, info.hasMore ? "本批完成，可继续生成下一批" : "分析完成，仪表板已生成");
+      $("aiRunStatus").textContent = info.hasMore ? "本批完成，可继续生成" : "分析完成";
+    } else if(task.status === "cancelled"){
+      aiLog("[CANCELLED] 任务已停止");
+      stopAiProgressTicker(Number(task.progress || aiVisualPct), "已停止");
+      $("aiRunStatus").textContent = "已停止";
+    } else {
+      aiLog("[ERR] " + (task.error || "分析失败"));
+      stopAiProgressTicker(Number(task.progress || aiVisualPct), "分析失败");
+      $("aiRunStatus").textContent = "分析失败";
+    }
+    clearAiTaskId(task.shopId || currentShop);
+    aiActiveTaskId = "";
+    aiPollCancelled = false;
+    resetAiBtn({hideProgress:false});
+  } catch(e){
+    if(aiActiveTaskId !== taskId || aiPollCancelled) return;
+    aiLog("[ERR] " + e.message);
+    stopAiProgressTicker(aiVisualPct, "读取任务状态失败");
+    $("aiRunStatus").textContent = "读取进度失败";
+    aiActiveTaskId = "";
+    resetAiBtn({hideProgress:false});
+  }
+}
+
+async function requestAiAnalysisBatch(offset=0, append=false){
+  const sid = $("shopId")?.value.trim() || currentShop;
+  if(!sid) return alert("请先选择或输入店铺 ID");
+
+  currentShop = sid;
+  $("aiGoBtn").style.display = "none";
+  $("aiStopBtn").style.display = "inline-flex";
+  $("aiProgressWrap").style.display = "block";
+  $("aiLog").style.display = "block";
+  if(!append){
+    $("aiLog").textContent = "";
+    $("aiResultCard").style.display = "none";
+    aiLastResult = null;
+  }
+  aiTaskAppend = append;
+  aiPollCancelled = false;
+  $("aiRunStatus").textContent = append ? "继续生成中..." : "任务已创建，等待后台分析...";
+  startAiProgressTicker();
+  setAiProgress(8, append ? "正在创建下一批分析任务..." : "正在创建后台分析任务...");
+  aiLog("=== Shop: " + sid + " | batch " + (offset + 1) + "-" + (offset + getAiBatchSize()) + " ===");
+
+  try {
+    const response = await post("/api/ai/analyze", {shopId: sid, issueOffset: offset, issueLimit: getAiBatchSize()});
+    if(!response.success){
+      aiLog("[ERR] " + (response.error || "任务创建失败"));
+      $("aiRunStatus").textContent = "任务创建失败";
+      stopAiProgressTicker(aiVisualPct, "任务创建失败");
+      resetAiBtn();
+      return;
+    }
+    aiActiveTaskId = response.taskId;
+    saveAiTaskId(sid, aiActiveTaskId);
+    await pollAiTask(aiActiveTaskId);
+  } catch(e){
+    aiLog("[ERR] " + e.message);
+    stopAiProgressTicker(aiVisualPct, "任务创建失败");
+    $("aiRunStatus").textContent = "任务创建失败";
+    resetAiBtn();
+  }
+}
+
+async function cancelAiAnalysis(){
+  const taskId = aiActiveTaskId;
+  aiPollCancelled = true;
+  aiActiveTaskId = "";
+  if(aiPollTimer){
+    clearTimeout(aiPollTimer);
+    aiPollTimer = null;
+  }
+  if(taskId){
+    try { await post("/api/ai/tasks/" + encodeURIComponent(taskId) + "/cancel", {}); } catch(e) {}
+  }
+  stopAiProgressTicker(aiVisualPct, "已停止");
+  clearAiTaskId(currentShop);
+  resetAiBtn();
+  $("aiRunStatus").textContent = "已停止";
+  $("aiLog").textContent += "[CANCELLED] 已发送停止请求\n";
+}
+
+async function restoreLatestAiTask(){
+  const sid = $("shopId")?.value.trim() || currentShop;
+  if(!sid || aiActiveTaskId) return;
+  try {
+    const response = await get("/api/ai/tasks/latest?shopId=" + encodeURIComponent(sid));
+    const task = response.task;
+    if(!response.success || !task) return;
+    if(task.status === "queued" || task.status === "running"){
+      currentShop = sid;
+      aiTaskAppend = false;
+      aiActiveTaskId = task.taskId;
+      aiPollCancelled = false;
+      $("aiGoBtn").style.display = "none";
+      $("aiStopBtn").style.display = "inline-flex";
+      $("aiProgressWrap").style.display = "block";
+      $("aiLog").style.display = "block";
+      startAiProgressTicker();
+      await pollAiTask(task.taskId);
+    } else if(task.status === "succeeded" && task.result){
+      aiLastResult = task.result;
+      renderAiResults(aiLastResult);
+    }
+  } catch(e) {
+    console.debug("restoreLatestAiTask", e);
+  }
 }
 
 

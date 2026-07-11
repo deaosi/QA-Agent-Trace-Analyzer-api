@@ -1,20 +1,25 @@
 """QA Agent Trace Analyzer."""
 
 import csv
+import hashlib
+import ipaddress
 import io
 import json
 import os
 import re
 import secrets
 import time
+import threading
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from functools import wraps
 
 import requests
 from flask import Flask, has_request_context, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from storage import load_json as storage_load_json, save_json as storage_save_json
+from shared_store import SharedStore
 
 try:
     import jieba
@@ -34,11 +39,19 @@ ACCESS_PASSWORD = os.environ.get("QA_ACCESS_PASSWORD", "")
 ADMIN_USERNAME = os.environ.get("QA_ADMIN_USERNAME", "shuxing666")
 ADMIN_PASSWORD = os.environ.get("QA_ADMIN_PASSWORD", ACCESS_PASSWORD or "asdfghjkl")
 AI_CONFIG_FILE = os.path.join(DATA_DIR, ".ai_config.json")
+DB_FILE = os.path.join(DATA_DIR, "qa_shared.sqlite3")
+SHARED_STORE = SharedStore(DB_FILE)
+SHARED_STORE.migrate_legacy(DATA_DIR, SHOPS_FILE, ISSUE_STATUS_FILE, storage_load_json)
+SHARED_STORE.fail_incomplete_ai_tasks()
 
 DEFAULT_AI_CONFIG = {
+    "providerName": "",
+    "providerNote": "",
+    "providerWebsite": "",
     "baseUrl": "https://api.xxx.com/v1",
     "model": "",
     "apiKey": "",
+    "fullUrl": False,
     "temperature": 0.3,
     "maxTokens": 4096,
     "timeoutSeconds": 300,
@@ -54,6 +67,24 @@ AI_CONNECT_TIMEOUT_SECONDS = 20
 AI_DEFAULT_READ_TIMEOUT_SECONDS = 300
 AI_MIN_READ_TIMEOUT_SECONDS = 60
 AI_MAX_READ_TIMEOUT_SECONDS = 900
+AI_PROMPT_VERSION = "deep-analysis-v2"
+
+SHOP_SYNC_URL = "https://agent.tanyuai.com/v2/agent-builder/knowledge-base"
+SHOP_SYNC_STATE = {
+    "running": False,
+    "startedAt": "",
+    "finishedAt": "",
+    "success": False,
+    "message": "",
+    "savedCookieCount": 0,
+    "savedShopCount": 0,
+    "shops": [],
+}
+SHOP_SYNC_LOCK = threading.Lock()
+SHOP_SYNC_SID_KEYS = {"sid", "shopid", "shop_id", "thirdshopid", "third_shop_id", "thirdshopids"}
+SHOP_SYNC_NAME_KEYS = {"name", "shopname", "shop_name", "title", "label"}
+SHOP_SYNC_NOISE_KEYS = {"sessionid", "csrf", "token", "userid", "user_id", "traceid", "requestid"}
+
 
 
 class InvalidShopId(ValueError):
@@ -62,6 +93,20 @@ class InvalidShopId(ValueError):
 
 def resolve_secret_key(environ=os.environ):
     return environ.get("QA_SECRET_KEY", DEFAULT_SECRET_KEY)
+
+
+def validate_startup_security(environ=os.environ):
+    """Fail closed for production entrypoints while keeping local imports usable."""
+    mode = str(environ.get("QA_ENV", "")).strip().lower()
+    required = mode in {"production", "prod"} or str(environ.get("QA_REQUIRE_SECURE_CONFIG", "")).strip() == "1"
+    if not required:
+        return
+    secret = str(environ.get("QA_SECRET_KEY", "")).strip()
+    password = str(environ.get("QA_ADMIN_PASSWORD", "")).strip()
+    if not secret or secret == DEFAULT_SECRET_KEY:
+        raise RuntimeError("QA_SECRET_KEY must be set to a unique value in production")
+    if not password:
+        raise RuntimeError("QA_ADMIN_PASSWORD must be set in production")
 
 
 def warn_if_default_secret(secret):
@@ -121,6 +166,14 @@ def load_json(path, default=None):
 
 def save_json(path, data):
     storage_save_json(path, data)
+
+
+def cookie_file_for_user(username=None):
+    username = str(username or (session.get("username", "") if has_request_context() else "")).strip()
+    if not username:
+        username = "anonymous"
+    digest = hashlib.sha256(username.encode("utf-8")).hexdigest()[:24]
+    return os.path.join(DATA_DIR, f".cookies_user_{digest}.json")
 
 
 def now_iso():
@@ -257,20 +310,305 @@ def parse_cookie_string(raw):
     return pairs
 
 
-def build_session():
-    saved = load_json(COOKIE_FILE)
+def build_session(username=None):
+    username = str(username or (session.get("username", "") if has_request_context() else "")).strip()
+    saved = load_json(cookie_file_for_user(username))
+    if not saved and username == ADMIN_USERNAME:
+        saved = load_json(COOKIE_FILE)
     if not saved:
         return None
 
-    session = requests.Session()
+    http_session = requests.Session()
     for name, value in saved.items():
-        session.cookies.set(name, value, domain=".tanyuai.com")
+        http_session.cookies.set(name, value, domain=".tanyuai.com")
 
     try:
-        session.get("https://agent.tanyuai.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        http_session.get("https://agent.tanyuai.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
     except requests.RequestException:
         pass
-    return session
+    return http_session
+
+
+def normalize_shop_sid(value):
+    sid = str(value or "").strip()
+    if not sid or not SHOP_ID_PATTERN.fullmatch(sid):
+        return ""
+    lowered = sid.lower()
+    if lowered in {"sid", "shopid", "null", "none", "undefined", "true", "false"}:
+        return ""
+    return sid
+
+
+def find_nearby_shop_name(obj):
+    if not isinstance(obj, dict):
+        return ""
+    for key, value in obj.items():
+        compact = re.sub(r"[^a-z0-9]", "", str(key).lower())
+        if compact in SHOP_SYNC_NAME_KEYS and isinstance(value, (str, int, float)):
+            name = str(value).strip()
+            if name:
+                return name[:120]
+    return ""
+
+
+def collect_shop_candidates(obj, found=None, depth=0):
+    if found is None:
+        found = {}
+    if depth > 8:
+        return found
+    if isinstance(obj, dict):
+        nearby_name = find_nearby_shop_name(obj)
+        for key, value in obj.items():
+            compact = re.sub(r"[^a-z0-9]", "", str(key).lower())
+            if compact in SHOP_SYNC_NOISE_KEYS:
+                continue
+            values = value if isinstance(value, list) else [value]
+            if compact in SHOP_SYNC_SID_KEYS or compact.endswith("sid") or compact.endswith("shopid"):
+                for item in values:
+                    sid = normalize_shop_sid(item)
+                    if sid:
+                        current = found.get(sid, {}) if isinstance(found.get(sid), dict) else {}
+                        current.setdefault("name", nearby_name or sid)
+                        found[sid] = current
+            collect_shop_candidates(value, found, depth + 1)
+    elif isinstance(obj, list):
+        for item in obj[:5000]:
+            collect_shop_candidates(item, found, depth + 1)
+    elif isinstance(obj, str) and depth <= 4:
+        raw = obj.strip()
+        if raw.startswith("{") or raw.startswith("["):
+            try:
+                collect_shop_candidates(json.loads(raw), found, depth + 1)
+            except ValueError:
+                pass
+    return found
+
+
+def collect_shop_candidates_from_text(raw, found=None):
+    if found is None:
+        found = {}
+    text_value = str(raw or "")
+    patterns = [
+        r'''(?i)["\'](?:thirdShopId|third_shop_id|shopId|shop_id|sid)["\']\s*[:=]\s*["\']([A-Za-z0-9_.-]{1,128})["\']''',
+        r"(?i)(?:thirdShopId|third_shop_id|shopId|shop_id|sid)=([A-Za-z0-9_.-]{1,128})",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text_value):
+            sid = normalize_shop_sid(match.group(1))
+            if sid:
+                found.setdefault(sid, {"name": sid})
+    return found
+
+
+def normalize_shop_name(value):
+    """Use the visible shop name as the auto-sync duplicate grouping key."""
+    return re.sub(r"[\s\u3000]+", "", str(value or "")).casefold()
+
+
+def save_synced_shops(candidates):
+    existing = SHARED_STORE.list_shops()
+    by_sid = {}
+
+    # Include existing records in the grouping. This prevents a new sync from
+    # adding another SID when the shared store already has the same shop name.
+    for raw_sid, info in existing.items():
+        sid = normalize_shop_sid(raw_sid)
+        if not sid:
+            continue
+        current = info if isinstance(info, dict) else {}
+        display_name = str(current.get("name") or sid).strip() or sid
+        by_sid[sid] = {
+            "name": display_name,
+            "total": current.get("total", 0),
+            "traceCount": current.get("traceCount", 0),
+            "source": current.get("source", ""),
+            "existing": True,
+        }
+
+    for raw_sid, info in sorted(candidates.items(), key=lambda item: str(item[0])):
+        sid = normalize_shop_sid(raw_sid)
+        if not sid:
+            continue
+        name = info.get("name") if isinstance(info, dict) else info
+        candidate_name = str(name or "").strip()
+        current = by_sid.get(sid, {})
+        current_name = str(current.get("name") or sid).strip() or sid
+        # A candidate's human-readable name is more useful than a SID placeholder.
+        if candidate_name and (not current_name or current_name == sid):
+            current_name = candidate_name
+        by_sid[sid] = {
+            "name": current_name,
+            "total": current.get("total", 0),
+            "traceCount": current.get("traceCount", 0),
+            "source": current.get("source", ""),
+            "existing": bool(current.get("existing")),
+        }
+
+    grouped = defaultdict(list)
+    for sid, info in by_sid.items():
+        grouped[normalize_shop_name(info["name"]) or sid].append((sid, info))
+
+    saved = []
+    for group in grouped.values():
+        def rank(item):
+            sid, info = item
+            trace_count = int(info.get("traceCount", 0) or 0)
+            total = int(info.get("total", 0) or 0)
+            # Preserve an existing SID on ties, then use a stable SID order.
+            return (-trace_count, -total, 0 if info.get("existing") else 1, sid)
+
+        sid, info = sorted(group, key=rank)[0]
+        source = info.get("source") or "auto-sync"
+        SHARED_STORE.upsert_shop(sid, info["name"], info.get("total", 0), source)
+        saved.append({"id": sid, "name": info["name"]})
+    return saved
+
+
+def cookie_header_from_playwright(cookies):
+    pairs = {}
+    for cookie in cookies:
+        domain = str(cookie.get("domain", ""))
+        name = str(cookie.get("name", "")).strip()
+        value = str(cookie.get("value", ""))
+        if name and "tanyuai.com" in domain:
+            pairs[name] = value
+    return pairs
+
+
+def set_shop_sync_state(**kwargs):
+    with SHOP_SYNC_LOCK:
+        SHOP_SYNC_STATE.update(kwargs)
+        return dict(SHOP_SYNC_STATE)
+
+
+def run_shop_sync(username="", timeout_seconds=180):
+    set_shop_sync_state(
+        running=True,
+        startedAt=datetime.now().isoformat(),
+        finishedAt="",
+        success=False,
+        message="正在打开浏览器，请在弹出的页面完成登录。",
+        savedCookieCount=0,
+        savedShopCount=0,
+        shops=[],
+    )
+    candidates = {}
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+    except ImportError:
+        set_shop_sync_state(
+            running=False,
+            finishedAt=datetime.now().isoformat(),
+            success=False,
+            message="缺少 Playwright 依赖，请先安装 requirements.txt 并执行 playwright install chromium。",
+        )
+        return
+
+    try:
+        with sync_playwright() as pw:
+            profile_digest = hashlib.sha256(str(username or "anonymous").encode("utf-8")).hexdigest()[:24]
+            user_data_dir = os.path.join(DATA_DIR, f"playwright-agent-profile-{profile_digest}")
+            launch_options = {
+                "headless": False,
+                "viewport": {"width": 1280, "height": 860},
+                "args": ["--disable-blink-features=AutomationControlled"],
+            }
+            try:
+                context = pw.chromium.launch_persistent_context(user_data_dir, **launch_options)
+            except Exception as first_exc:
+                try:
+                    context = pw.chromium.launch_persistent_context(user_data_dir, channel="msedge", **launch_options)
+                except Exception as edge_exc:
+                    raise RuntimeError(f"无法启动 Playwright Chromium 或 Edge：{edge_exc}") from first_exc
+            page = context.pages[0] if context.pages else context.new_page()
+
+            def handle_response(resp):
+                parsed = urlparse(resp.url)
+                if not parsed.netloc.endswith("agent.tanyuai.com"):
+                    return
+                try:
+                    ctype = (resp.headers or {}).get("content-type", "")
+                    if "json" in ctype:
+                        collect_shop_candidates(resp.json(), candidates)
+                    else:
+                        body = resp.text()
+                        if body and ("sid" in body.lower() or "shop" in body.lower()):
+                            try:
+                                collect_shop_candidates(json.loads(body), candidates)
+                            except ValueError:
+                                collect_shop_candidates_from_text(body, candidates)
+                except Exception:
+                    return
+
+            page.on("response", handle_response)
+            page.goto(SHOP_SYNC_URL, wait_until="domcontentloaded", timeout=60000)
+            deadline = time.time() + max(int(timeout_seconds), 30)
+            last_count = -1
+            stable_since = time.time()
+            while time.time() < deadline:
+                try:
+                    if "agent.tanyuai.com" not in page.url:
+                        page.goto(SHOP_SYNC_URL, wait_until="domcontentloaded", timeout=60000)
+                    page.wait_for_timeout(2000)
+                    collect_shop_candidates_from_text(page.content(), candidates)
+                    storage_items = page.evaluate("""
+                    () => {
+                      const items = [];
+                      for (const store of [localStorage, sessionStorage]) {
+                        for (let i = 0; i < store.length; i++) {
+                          const key = store.key(i);
+                          items.push({key, value: store.getItem(key)});
+                        }
+                      }
+                      return items;
+                    }
+                    """)
+                    collect_shop_candidates(storage_items, candidates)
+                    storage_text = json.dumps(storage_items, ensure_ascii=False)
+                    collect_shop_candidates_from_text(storage_text, candidates)
+                except PlaywrightTimeoutError:
+                    pass
+                except Exception:
+                    pass
+
+                count = len(candidates)
+                if count != last_count:
+                    set_shop_sync_state(message=f"已发现 {count} 个候选店铺，继续等待页面接口完成。", savedShopCount=count)
+                    last_count = count
+                    stable_since = time.time()
+                elif count > 0 and time.time() - stable_since >= 8:
+                    break
+
+            cookies = cookie_header_from_playwright(context.cookies("https://agent.tanyuai.com"))
+            if cookies:
+                save_json(cookie_file_for_user(username), cookies)
+            saved_shops = save_synced_shops(candidates)
+            context.close()
+            if not cookies:
+                message = "未读取到 agent.tanyuai.com Cookie，请确认弹出的浏览器已登录。"
+                success = False
+            elif not saved_shops:
+                message = "Cookie 已保存，但没有发现店铺 SID。请在弹出的页面确认已进入知识库店铺列表。"
+                success = False
+            else:
+                message = f"同步完成：保存 Cookie {len(cookies)} 项，店铺 {len(saved_shops)} 个。"
+                success = True
+            set_shop_sync_state(
+                running=False,
+                finishedAt=datetime.now().isoformat(),
+                success=success,
+                message=message,
+                savedCookieCount=len(cookies),
+                savedShopCount=len(saved_shops),
+                shops=saved_shops[:200],
+            )
+    except Exception as exc:
+        set_shop_sync_state(
+            running=False,
+            finishedAt=datetime.now().isoformat(),
+            success=False,
+            message=f"自动同步失败：{exc}",
+        )
 
 
 def request_headers():
@@ -290,6 +628,14 @@ def normalize_datetime(value, fallback):
     if re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", value):
         value += ":00"
     return value
+
+
+def parse_filter_timestamp(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00").replace("T", " "))
+    return parsed.timestamp() * 1000
 
 
 
@@ -499,7 +845,7 @@ def index():
 @app.route("/api/cookie-status")
 @require_auth
 def cookie_status():
-    return jsonify({"hasCookie": bool(load_json(COOKIE_FILE))})
+    return jsonify({"hasCookie": bool(load_json(cookie_file_for_user()))})
 
 
 @app.route("/api/save-cookie", methods=["POST"])
@@ -508,15 +854,39 @@ def save_cookie():
     pairs = parse_cookie_string((request.get_json() or {}).get("cookie", ""))
     if not pairs:
         return jsonify({"success": False, "error": "Cookie 为空或格式无效"}), 400
-    save_json(COOKIE_FILE, pairs)
+    save_json(cookie_file_for_user(), pairs)
     return jsonify({"success": True})
+
+
+
+@app.route("/api/auto-sync-shops", methods=["POST"])
+@require_auth
+def auto_sync_shops():
+    with SHOP_SYNC_LOCK:
+        if SHOP_SYNC_STATE.get("running"):
+            return jsonify({"success": False, "error": "自动同步正在运行", "state": dict(SHOP_SYNC_STATE)}), 409
+    try:
+        timeout_seconds = max(30, min(int((request.get_json() or {}).get("timeoutSeconds") or 180), 900))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "同步超时时间无效"}), 400
+    username = session.get("username", "")
+    thread = threading.Thread(target=run_shop_sync, args=(username, timeout_seconds), daemon=True)
+    thread.start()
+    return jsonify({"success": True, "state": dict(SHOP_SYNC_STATE)})
+
+
+@app.route("/api/auto-sync-shops/status")
+@require_auth
+def auto_sync_shops_status():
+    with SHOP_SYNC_LOCK:
+        return jsonify({"success": True, "state": dict(SHOP_SYNC_STATE)})
 
 
 @app.route("/api/shops")
 @require_auth
 def list_shops():
-    shops = load_json(SHOPS_FILE, {})
-    return jsonify({"shops": [{"id": k, "name": v.get("name", k)} for k, v in shops.items()], "current": None})
+    shops = SHARED_STORE.list_shops()
+    return jsonify({"shops": [{"id": k, "name": v.get("name", k), "total": v.get("total", 0), "traceCount": v.get("traceCount", 0), "source": v.get("source", "")} for k, v in shops.items()], "current": None})
 
 
 @app.route("/api/set-shop", methods=["POST"])
@@ -537,7 +907,7 @@ def probe_shop():
     if raw_cookie:
         pairs = parse_cookie_string(raw_cookie)
         if pairs:
-            save_json(COOKIE_FILE, pairs)
+            save_json(cookie_file_for_user(), pairs)
 
     session = build_session()
     if not session:
@@ -565,9 +935,7 @@ def probe_shop():
     results = data_obj.get("results", [])
     shop_name = results[0].get("shopName", "") if results else ""
 
-    shops = load_json(SHOPS_FILE, {})
-    shops[shop_id] = {"name": shop_name or shop_id, "total": total, "updated": datetime.now().isoformat()}
-    save_json(SHOPS_FILE, shops)
+    SHARED_STORE.upsert_shop(shop_id, shop_name or shop_id, total, "probe")
     return jsonify({"success": True, "shopName": shop_name or shop_id, "total": total})
 
 
@@ -575,15 +943,46 @@ def probe_shop():
 @require_auth
 def delete_shop():
     shop_id = str((request.get_json() or {}).get("shopId", "")).strip()
-    shops = load_json(SHOPS_FILE, {})
-    if shop_id in shops:
-        del shops[shop_id]
-        save_json(SHOPS_FILE, shops)
-
-    for path in (data_file(shop_id), analysis_file(shop_id)):
-        if shop_id and os.path.exists(path):
-            os.remove(path)
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"}), 400
+    shop_file_token(shop_id)
+    SHARED_STORE.delete_shop(shop_id)
     return jsonify({"success": True})
+
+
+@app.route("/api/delete-shops", methods=["POST"])
+@require_auth
+def delete_shops():
+    data = request.get_json() or {}
+    raw_ids = data.get("shopIds", [])
+    if isinstance(raw_ids, str):
+        raw_ids = [raw_ids]
+    if not isinstance(raw_ids, list):
+        return jsonify({"success": False, "error": "店铺 ID 列表无效"}), 400
+
+    shop_ids = []
+    seen = set()
+    for raw_id in raw_ids:
+        shop_id = str(raw_id or "").strip()
+        if not shop_id:
+            continue
+        shop_file_token(shop_id)
+        key = shop_id.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        shop_ids.append(shop_id)
+    if not shop_ids:
+        return jsonify({"success": False, "error": "请先勾选要删除的店铺"}), 400
+
+    stored_shops = SHARED_STORE.list_shops()
+    deleted_ids = []
+    for shop_id in shop_ids:
+        matching_ids = [stored_id for stored_id in stored_shops if stored_id.lower() == shop_id.lower()]
+        for stored_id in matching_ids or [shop_id]:
+            SHARED_STORE.delete_shop(stored_id)
+            deleted_ids.append(stored_id)
+    return jsonify({"success": True, "deleted": deleted_ids, "count": len(deleted_ids)})
 
 
 @app.route("/api/fetch", methods=["POST"])
@@ -593,15 +992,20 @@ def fetch_data():
     shop_id = str(data.get("shopId", "")).strip()
     if not shop_id:
         return jsonify({"success": False, "log": [{"page": 1, "status": "error", "msg": "请指定店铺 ID"}]})
+    shop_file_token(shop_id)
 
-    session = build_session()
-    if not session:
+    username = session.get("username", "")
+    http_session = build_session()
+    if not http_session:
         return jsonify({"success": False, "log": [{"page": 1, "status": "error", "msg": "请先配置 Cookie"}]})
 
     begin_time = normalize_datetime(data.get("beginTime"), "2024-01-01 00:00:00")
     end_time = normalize_datetime(data.get("endTime"), datetime.now().strftime("%Y-%m-%d 23:59:59"))
-    page_size = max(int(data.get("pageSize") or 100), 1)
-    max_pages = max(int(data.get("maxPages") or 10), 1)
+    try:
+        page_size = max(1, min(int(data.get("pageSize") or 100), 500))
+        max_pages = max(1, min(int(data.get("maxPages") or 10), 200))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "log": [{"page": 1, "status": "error", "msg": "分页参数无效"}]}), 400
     filters = data.get("filters", {}) or {}
     raw_payload = data.get("rawPayload", "")
     payload_template = {}
@@ -636,7 +1040,7 @@ def fetch_data():
             first_request_body = dict(body)
 
         try:
-            resp = session.post(TRACE_API, json=body, headers=request_headers(), timeout=30)
+            resp = http_session.post(TRACE_API, json=body, headers=request_headers(), timeout=30)
             result = resp.json()
         except (requests.RequestException, ValueError) as e:
             fetch_log.append({"page": page_idx, "status": "error", "msg": str(e)})
@@ -668,28 +1072,23 @@ def fetch_data():
             break
         time.sleep(0.3)
 
-    df = data_file(shop_id)
     total_fetched = 0
     if all_records:
-        if data.get("overwrite", False):
-            save_json(df, all_records)
-            total_fetched = len(all_records)
-        else:
-            existing = load_json(df, [])
-            seen = {r.get("id") for r in existing if isinstance(r, dict)}
-            new_records = [r for r in all_records if isinstance(r, dict) and r.get("id") not in seen]
-            save_json(df, existing + new_records)
-            total_fetched = len(new_records)
+        merge_result = SHARED_STORE.merge_traces(
+            shop_id,
+            all_records,
+            fetched_by=username,
+            overwrite=bool(data.get("overwrite", False)),
+        )
+        total_fetched = merge_result["inserted"]
 
     if shop_name:
-        shops = load_json(SHOPS_FILE, {})
-        shops[shop_id] = {"name": shop_name, "updated": datetime.now().isoformat()}
-        save_json(SHOPS_FILE, shops)
+        SHARED_STORE.upsert_shop(shop_id, shop_name, SHARED_STORE.count_traces(shop_id), "fetch")
 
     return jsonify({
         "success": True,
         "totalFetched": total_fetched,
-        "totalStored": len(load_json(df, [])),
+        "totalStored": SHARED_STORE.count_traces(shop_id),
         "shopName": shop_name,
         "requestBody": first_request_body,
         "log": fetch_log,
@@ -977,7 +1376,7 @@ def build_issue_workbench(traces, shop_id=""):
         if severity_order.get(issue_type, 0) > severity_order.get(group["issueType"], 0):
             group["issueType"] = issue_type
 
-    status_map = load_json(ISSUE_STATUS_FILE, {})
+    status_map = SHARED_STORE.load_issue_status()
     issues = []
     for issue in groups.values():
         priority, score = priority_score(
@@ -1423,10 +1822,13 @@ def run_analysis(traces, shop_id=""):
 @require_auth
 def analyze():
     shop_id = str((request.get_json() or {}).get("shopId", "")).strip()
-    traces = load_json(data_file(shop_id), [])
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"}), 400
+    shop_file_token(shop_id)
+    traces = SHARED_STORE.load_traces(shop_id)
     result = run_analysis(traces, shop_id)
     if shop_id:
-        save_json(analysis_file(shop_id), result)
+        SHARED_STORE.save_analysis(shop_id, result)
     return jsonify({"success": True, "data": result})
 
 
@@ -1436,12 +1838,13 @@ def get_analysis():
     shop_id = request.args.get("shopId", "").strip()
     if not shop_id:
         return jsonify({"success": False, "error": "缺少店铺 ID"}), 400
-    analysis = load_json(analysis_file(shop_id), {})
+    shop_file_token(shop_id)
+    analysis = SHARED_STORE.load_analysis(shop_id)
     if analysis and ("storeDiagnosis" not in analysis or "topicInsights" not in analysis):
-        traces = load_json(data_file(shop_id), [])
+        traces = SHARED_STORE.load_traces(shop_id)
         if traces:
             analysis = run_analysis(traces, shop_id)
-            save_json(analysis_file(shop_id), analysis)
+            SHARED_STORE.save_analysis(shop_id, analysis)
     if not analysis:
         return jsonify({"success": False, "error": "暂无分析结果"})
     return jsonify({"success": True, "data": analysis})
@@ -1463,16 +1866,20 @@ def export_chat():
 
     if not shop_id:
         return jsonify({"success": False, "error": "缺少店铺 ID"})
-    traces = load_json(data_file(shop_id), [])
+    shop_file_token(shop_id)
+    traces = SHARED_STORE.load_traces(shop_id)
     if not traces:
         return jsonify({"success": False, "error": "没有可导出的数据"})
 
     # Optional time filters
-    if begin_time:
-        begin_ts = datetime.fromisoformat(begin_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+    try:
+        begin_ts = parse_filter_timestamp(begin_time)
+        end_ts = parse_filter_timestamp(end_time)
+    except (TypeError, ValueError, OverflowError):
+        return jsonify({"success": False, "error": "时间筛选格式无效"}), 400
+    if begin_ts is not None:
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) >= begin_ts]
-    if end_time:
-        end_ts = datetime.fromisoformat(end_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+    if end_ts is not None:
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) <= end_ts]
 
     rows = []
@@ -1537,28 +1944,38 @@ def chat_records():
         shop_id = request.args.get("shopId", "").strip()
         begin_time = request.args.get("beginTime", "")
         end_time = request.args.get("endTime", "")
-        page = int(request.args.get("page", 1))
-        page_size = int(request.args.get("pageSize", 50))
+        page_raw = request.args.get("page", 1)
+        page_size_raw = request.args.get("pageSize", 50)
     else:
         data = request.get_json() or {}
         shop_id = str(data.get("shopId", "")).strip()
         begin_time = data.get("beginTime", "")
         end_time = data.get("endTime", "")
-        page = int(data.get("page", 1))
-        page_size = int(data.get("pageSize", 50))
+        page_raw = data.get("page", 1)
+        page_size_raw = data.get("pageSize", 50)
+
+    try:
+        page = max(1, min(int(page_raw), 1000000))
+        page_size = max(1, min(int(page_size_raw), 200))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "分页参数无效"}), 400
 
     if not shop_id:
         return jsonify({"success": False, "error": "缺少店铺 ID"})
-    traces = load_json(data_file(shop_id), [])
+    shop_file_token(shop_id)
+    traces = SHARED_STORE.load_traces(shop_id)
     if not traces:
         return jsonify({"success": False, "error": "没有可展示的聊天记录"})
 
     # Apply time filters
-    if begin_time:
-        begin_ts = datetime.fromisoformat(begin_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+    try:
+        begin_ts = parse_filter_timestamp(begin_time)
+        end_ts = parse_filter_timestamp(end_time)
+    except (TypeError, ValueError, OverflowError):
+        return jsonify({"success": False, "error": "时间筛选格式无效"}), 400
+    if begin_ts is not None:
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) >= begin_ts]
-    if end_time:
-        end_ts = datetime.fromisoformat(end_time.replace("T", " ").rstrip(":00")).timestamp() * 1000
+    if end_ts is not None:
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) <= end_ts]
 
     total = len(traces)
@@ -1621,11 +2038,12 @@ def issue_detail():
 
     if not shop_id or not trace_ids_str:
         return jsonify({"success": False, "error": "缺少参数"})
+    shop_file_token(shop_id)
     trace_ids = [tid.strip() for tid in trace_ids_str.split(",") if tid.strip()]
     if not trace_ids:
         return jsonify({"success": False, "error": "没有trace ID"})
 
-    traces = load_json(data_file(shop_id), [])
+    traces = SHARED_STORE.load_traces(shop_id)
     if not traces:
         return jsonify({"success": False, "error": "没有数据"})
 
@@ -1691,16 +2109,15 @@ def update_issue_status():
     allowed = {"待处理", "已确认问题", "需要补知识", "需要改话术", "加转人工规则", "已补知识", "已优化话术", "复查通过", "忽略"}
     if not shop_id or not issue_id or status not in allowed:
         return jsonify({"success": False, "error": "参数无效"}), 400
-    status_map = load_json(ISSUE_STATUS_FILE, {})
-    status_map[issue_status_key(shop_id, issue_id)] = status
-    save_json(ISSUE_STATUS_FILE, status_map)
+    shop_file_token(shop_id)
+    SHARED_STORE.set_issue_status(shop_id, issue_id, status)
 
-    analysis = load_json(analysis_file(shop_id), {})
+    analysis = SHARED_STORE.load_analysis(shop_id)
     for issue in analysis.get("issueWorkbench", []):
         if issue.get("id") == issue_id:
             issue["status"] = status
     if analysis:
-        save_json(analysis_file(shop_id), analysis)
+        SHARED_STORE.save_analysis(shop_id, analysis)
     return jsonify({"success": True, "status": status})
 
 
@@ -1708,8 +2125,10 @@ def update_issue_status():
 @require_auth
 def overview():
     shop_id = request.args.get("shopId", "").strip()
-    traces = load_json(data_file(shop_id), []) if shop_id else []
-    analysis = load_json(analysis_file(shop_id), {}) if shop_id else {}
+    if shop_id:
+        shop_file_token(shop_id)
+    traces = SHARED_STORE.load_traces(shop_id) if shop_id else []
+    analysis = SHARED_STORE.load_analysis(shop_id) if shop_id else {}
     total_qa = sum(len(topic.get("examples", [])) for topic in analysis.get("qaExamples", []))
     return jsonify({
         "totalTraces": len(traces),
@@ -1722,7 +2141,8 @@ def overview():
 
 @app.errorhandler(Exception)
 def handle_error(e):
-    return jsonify({"success": False, "error": str(e)}), 500
+    app.logger.exception("Unhandled request error")
+    return jsonify({"success": False, "error": "服务暂时不可用，请稍后重试"}), 500
 
 
 # ============================================================
@@ -1746,6 +2166,7 @@ def normalize_ai_config(config):
     normalized["baseUrl"] = str(normalized.get("baseUrl", "") or "").strip()
     normalized["model"] = str(normalized.get("model", "") or "").strip()
     normalized["apiKey"] = str(normalized.get("apiKey", "") or "").strip()
+    normalized["fullUrl"] = bool(normalized.get("fullUrl", False))
     try:
         normalized["temperature"] = float(normalized.get("temperature", DEFAULT_AI_CONFIG["temperature"]) or DEFAULT_AI_CONFIG["temperature"])
     except (TypeError, ValueError):
@@ -1769,6 +2190,7 @@ def legacy_ai_config_from_store(store):
             "baseUrl": provider.get("baseUrl", ""),
             "model": provider.get("model", ""),
             "apiKey": provider.get("apiKey", ""),
+            "fullUrl": provider.get("fullUrl", False),
             "temperature": store.get("temperature", 0.3),
             "maxTokens": store.get("maxTokens", 4096),
             "timeoutSeconds": store.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS),
@@ -1844,6 +2266,26 @@ def _mask_api_key(key):
     return key[:4] + "***" + key[-4:]
 
 
+def validate_ai_base_url(value):
+    value = str(value or "").strip()
+    if not value:
+        return False, "Base URL 不能为空"
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if parsed.scheme.lower() != "https" or not hostname or parsed.username or parsed.password:
+        return False, "Base URL 必须是无凭据的 HTTPS 地址"
+    if hostname in {"localhost", "localhost.localdomain", "metadata.google.internal"}:
+        return False, "Base URL 不允许访问本机或云元数据地址"
+    try:
+        address = ipaddress.ip_address(hostname)
+        if address.is_private or address.is_loopback or address.is_link_local or address.is_reserved:
+            return False, "Base URL 不允许访问内网地址"
+    except ValueError:
+        if "." not in hostname:
+            return False, "Base URL 域名无效"
+    return True, ""
+
+
 def clamp_ai_timeout_seconds(value):
     try:
         timeout = int(value)
@@ -1858,6 +2300,7 @@ def _resolve_config(cfg):
         "apiKey": cfg.get("apiKey", "").strip(),
         "baseUrl": cfg.get("baseUrl", "").strip(),
         "model": cfg.get("model", "").strip(),
+        "fullUrl": bool(cfg.get("fullUrl", False)),
         "temperature": float(cfg.get("temperature", 0.3)),
         "maxTokens": int(cfg.get("maxTokens", 4096)),
         "timeoutSeconds": clamp_ai_timeout_seconds(cfg.get("timeoutSeconds", AI_DEFAULT_READ_TIMEOUT_SECONDS)),
@@ -1876,12 +2319,15 @@ def _call_llm(system_prompt, user_text, cfg):
 
     if not api_key or not base_url or not model:
         return None, "未配置 API Key、Base URL 或 Model"
+    valid_url, url_error = validate_ai_base_url(base_url)
+    if not valid_url:
+        return None, url_error
 
     # Detect Anthropic vs OpenAI-compatible API format
     is_anthropic = "anthropic" in base_url.lower() or "anthropic" in api_key.lower()
 
     if is_anthropic:
-        url = base_url.rstrip("/") + "/messages"
+        url = base_url.rstrip("/") if p["fullUrl"] else base_url.rstrip("/") + "/messages"
         headers = {
             "Content-Type": "application/json",
             "x-api-key": api_key,
@@ -1896,7 +2342,7 @@ def _call_llm(system_prompt, user_text, cfg):
         }
     else:
         # OpenAI-compatible (default)
-        url = base_url.rstrip("/") + "/chat/completions"
+        url = base_url.rstrip("/") if p["fullUrl"] else base_url.rstrip("/") + "/chat/completions"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -1912,7 +2358,12 @@ def _call_llm(system_prompt, user_text, cfg):
         }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=(AI_CONNECT_TIMEOUT_SECONDS, timeout_seconds))
+        resp = requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=(AI_CONNECT_TIMEOUT_SECONDS, timeout_seconds),
+        )
         resp.raise_for_status()
         data = resp.json()
 
@@ -1961,6 +2412,10 @@ def ai_config_get():
         "config": {
             "baseUrl": cfg.get("baseUrl", ""),
             "model": cfg.get("model", ""),
+            "fullUrl": bool(cfg.get("fullUrl", False)),
+            "providerName": cfg.get("providerName", ""),
+            "providerNote": cfg.get("providerNote", ""),
+            "providerWebsite": cfg.get("providerWebsite", ""),
             "apiKey": masked_key,
             "apiKeyMasked": bool(masked_key),
             "temperature": cfg.get("temperature", 0.3),
@@ -1977,6 +2432,11 @@ def ai_config_save():
     cfg = load_ai_config()
 
     # Update temperature / max tokens
+    if "fullUrl" in data:
+        cfg["fullUrl"] = bool(data["fullUrl"])
+    for key in ("providerName", "providerNote", "providerWebsite"):
+        if key in data:
+            cfg[key] = str(data[key] or "").strip()
     if "temperature" in data:
         try:
             cfg["temperature"] = float(data["temperature"])
@@ -1994,6 +2454,10 @@ def ai_config_save():
     for key in ("baseUrl", "model"):
         if key in data:
             val = str(data[key]).strip()
+            if key == "baseUrl" and val:
+                valid_url, url_error = validate_ai_base_url(val)
+                if not valid_url:
+                    return jsonify({"success": False, "error": url_error}), 400
             cfg[key] = val
 
     # Only update apiKey if user actually typed something
@@ -2695,15 +3159,15 @@ def normalize_ai_result(result, local_analysis=None, batch_info=None):
     return result
 
 
-@app.route("/api/ai/analyze", methods=["POST"])
-@require_auth
-def ai_analyze():
+# Legacy synchronous implementation kept as an internal reference while the public endpoint uses tasks.
+def ai_analyze_legacy():
     data = request.get_json() or {}
     shop_id = str(data.get("shopId", "")).strip()
     if not shop_id:
         return jsonify({"success": False, "error": "缺少店铺 ID"})
+    shop_file_token(shop_id)
 
-    traces = load_json(data_file(shop_id), [])
+    traces = SHARED_STORE.load_traces(shop_id)
     if not traces:
         return jsonify({"success": False, "error": "没有可分析的数据，请先抓取数据"})
 
@@ -2712,10 +3176,10 @@ def ai_analyze():
     if not p["apiKey"] or not p["baseUrl"] or not p["model"]:
         return jsonify({"success": False, "error": "请先在 API 配置中设置模型参数"})
 
-    local_analysis = load_json(analysis_file(shop_id), {})
+    local_analysis = SHARED_STORE.load_analysis(shop_id)
     if not local_analysis or "storeDiagnosis" not in local_analysis or "topicInsights" not in local_analysis:
         local_analysis = run_analysis(traces, shop_id)
-        save_json(analysis_file(shop_id), local_analysis)
+        SHARED_STORE.save_analysis(shop_id, local_analysis)
 
     issue_offset = clamp_ai_issue_offset(data.get("issueOffset", data.get("offset", 0)))
     issue_limit = clamp_ai_issue_batch_limit(data.get("issueLimit", data.get("limit", AI_DEFAULT_ISSUE_BATCH_SIZE)))
@@ -2776,6 +3240,282 @@ def ai_analyze():
         return jsonify({"success": False, "error": error_text})
 
     return jsonify({"success": True, "data": result})
+
+
+def is_retryable_ai_error(error):
+    """Retry only transient provider failures, never invalid configuration or other 4xx errors."""
+    raw = str(error or "").lower()
+    if "timed out" in raw or "timeout" in raw:
+        return True
+    if re.search(r"(?:^|\D)429(?:\D|$)", raw):
+        return True
+    return bool(re.search(r"(?:^|\D)5\d\d(?:\D|$)", raw))
+
+
+def build_ai_cache_key(shop_id, traces, local_analysis, cfg, issue_offset, issue_limit):
+    local = dict(local_analysis) if isinstance(local_analysis, dict) else {}
+    local.pop("analyzedAt", None)
+    cache_payload = {
+        "version": AI_PROMPT_VERSION,
+        "shopId": shop_id,
+        "issueOffset": issue_offset,
+        "issueLimit": issue_limit,
+        "model": cfg.get("model", ""),
+        "baseUrl": cfg.get("baseUrl", ""),
+        "temperature": cfg.get("temperature", 0.3),
+        "maxTokens": cfg.get("maxTokens", 4096),
+        "traces": traces,
+        "localAnalysis": local,
+    }
+    raw = json.dumps(cache_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def serialize_ai_task(task, include_result=True):
+    if not task:
+        return None
+    result = {
+        key: task.get(key)
+        for key in (
+            "taskId", "shopId", "status", "progress", "stage", "issueOffset",
+            "issueLimit", "total", "generated", "error", "createdAt", "updatedAt",
+            "cancelRequested",
+        )
+    }
+    if include_result:
+        result["result"] = task.get("result")
+    return result
+
+
+def run_ai_llm_analysis(system_prompt, user_text, cfg, local_analysis, batch_info, issue_limit):
+    """Perform one analysis with bounded transient retries and one JSON repair retry."""
+    parse_error = None
+    llm_text = ""
+    request_cfg = dict(cfg)
+    current_prompt = user_text
+    repair_used = False
+    token_retry_plan = [8192, 12000]
+
+    for attempt in range(1, 4):
+        llm_text, err = _call_llm(system_prompt, current_prompt, request_cfg)
+        if err:
+            if attempt < 3 and is_retryable_ai_error(err):
+                time.sleep(2 ** (attempt - 1))
+                continue
+            return None, format_llm_error(err, attempt=attempt, issue_limit=issue_limit)
+        try:
+            return normalize_ai_result(parse_ai_response(llm_text), local_analysis, batch_info), None
+        except ValueError as exc:
+            parse_error = exc
+            if repair_used:
+                break
+            repair_used = True
+            if is_probably_truncated_ai_json_error(exc):
+                request_cfg["maxTokens"] = max(int(request_cfg.get("maxTokens", 0) or 0), token_retry_plan[0])
+            current_prompt = (
+                user_text
+                + "\n\nThe previous response was not valid complete JSON. Return only one compact, closed JSON object."
+                + " Do not use Markdown or explanations, and keep arrays concise."
+            )
+            time.sleep(0.3)
+
+    raw_preview = str(llm_text or "")[:800]
+    token_hint = (
+        "后端已自动进行一次 JSON 修复重试；仍失败时建议把每批调到 5-10 条，"
+        "或把 Max Tokens 调到 12000 后重试。"
+    )
+    return None, f"AI 返回格式解析失败: {parse_error}\n建议：{token_hint}\n原始内容: {raw_preview}"
+
+
+def _cancel_ai_task_if_requested(task_id):
+    task = SHARED_STORE.get_ai_task(task_id)
+    if task and (task.get("cancelRequested") or task.get("status") == "cancelled"):
+        SHARED_STORE.update_ai_task(task_id, status="cancelled", stage="已停止", progress=task.get("progress", 0))
+        return True
+    return False
+
+
+def run_ai_analysis_task(task_id, shop_id, username, cfg, issue_offset, issue_limit):
+    """Run the slow part outside the request thread while persisting visible state transitions."""
+    try:
+        with app.app_context():
+            SHARED_STORE.update_ai_task(task_id, status="running", progress=5, stage="准备分析")
+            if _cancel_ai_task_if_requested(task_id):
+                return
+
+            traces = SHARED_STORE.load_traces(shop_id)
+            if not traces:
+                SHARED_STORE.update_ai_task(task_id, status="failed", progress=100, stage="分析失败", error="没有可分析的数据，请先抓取数据")
+                return
+
+            local_analysis = SHARED_STORE.load_analysis(shop_id)
+            if not local_analysis or "storeDiagnosis" not in local_analysis or "topicInsights" not in local_analysis:
+                SHARED_STORE.update_ai_task(task_id, progress=25, stage="读取本地诊断")
+                local_analysis = run_analysis(traces, shop_id)
+                SHARED_STORE.save_analysis(shop_id, local_analysis)
+            else:
+                SHARED_STORE.update_ai_task(task_id, progress=35, stage="读取本地诊断")
+
+            if _cancel_ai_task_if_requested(task_id):
+                return
+
+            cache_key = build_ai_cache_key(shop_id, traces, local_analysis, cfg, issue_offset, issue_limit)
+            SHARED_STORE.update_ai_task(task_id, cacheKey=cache_key, total=len(local_analysis.get("issueWorkbench", [])))
+            cached = SHARED_STORE.find_cached_ai_result(cache_key)
+            if cached and cached.get("taskId") != task_id and cached.get("result"):
+                SHARED_STORE.update_ai_task(
+                    task_id,
+                    status="succeeded",
+                    progress=100,
+                    stage="已使用缓存结果",
+                    generated=len(cached.get("result", {}).get("issueOptimizationWorkbench", [])),
+                    result=cached["result"],
+                )
+                return
+
+            prompt_bundle = build_ai_analysis_prompt_bundle(
+                traces,
+                shop_id,
+                local_analysis,
+                issue_offset=issue_offset,
+                issue_limit=issue_limit,
+            )
+            system_prompt = prompt_bundle["systemPrompt"]
+            user_text = prompt_bundle["userText"]
+            batch_info = prompt_bundle["analysisContext"].get("issueBatch", {})
+            SHARED_STORE.update_ai_task(
+                task_id,
+                progress=62,
+                stage="调用模型",
+                total=batch_info.get("total", 0),
+            )
+            if _cancel_ai_task_if_requested(task_id):
+                return
+
+            result, error = run_ai_llm_analysis(
+                system_prompt,
+                user_text,
+                cfg,
+                local_analysis,
+                batch_info,
+                issue_limit,
+            )
+            if _cancel_ai_task_if_requested(task_id):
+                return
+            if error:
+                SHARED_STORE.update_ai_task(task_id, status="failed", progress=100, stage="分析失败", error=error)
+                return
+
+            generated = len(result.get("issueOptimizationWorkbench", [])) if isinstance(result, dict) else 0
+            SHARED_STORE.update_ai_task(
+                task_id,
+                status="succeeded",
+                progress=100,
+                stage="分析完成",
+                generated=generated,
+                total=batch_info.get("total", 0),
+                result=result,
+            )
+    except Exception:
+        app.logger.exception("AI task failed: %s", task_id)
+        SHARED_STORE.update_ai_task(
+            task_id,
+            status="failed",
+            progress=100,
+            stage="分析失败",
+            error="AI 分析任务执行异常，请稍后重试",
+        )
+
+
+@app.route("/api/ai/analyze", methods=["POST"])
+@require_auth
+def ai_analyze():
+    data = request.get_json() or {}
+    shop_id = str(data.get("shopId", "")).strip()
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"})
+    shop_file_token(shop_id)
+
+    traces = SHARED_STORE.load_traces(shop_id)
+    if not traces:
+        return jsonify({"success": False, "error": "没有可分析的数据，请先抓取数据"})
+
+    username = current_ai_config_username()
+    cfg = load_ai_config(username)
+    p = _resolve_config(cfg)
+    if not p["apiKey"] or not p["baseUrl"] or not p["model"]:
+        return jsonify({"success": False, "error": "请先在 API 配置中设置模型参数"})
+
+    issue_offset = clamp_ai_issue_offset(data.get("issueOffset", data.get("offset", 0)))
+    issue_limit = clamp_ai_issue_batch_limit(data.get("issueLimit", data.get("limit", AI_DEFAULT_ISSUE_BATCH_SIZE)))
+    local_analysis = SHARED_STORE.load_analysis(shop_id)
+    cache_key = build_ai_cache_key(shop_id, traces, local_analysis, p, issue_offset, issue_limit)
+    cached = SHARED_STORE.find_cached_ai_result(cache_key)
+    if cached and cached.get("result"):
+        task_id = SHARED_STORE.create_ai_task(
+            shop_id,
+            username=username,
+            cache_key=cache_key,
+            issue_offset=issue_offset,
+            issue_limit=issue_limit,
+            status="succeeded",
+            progress=100,
+            stage="已使用缓存结果",
+            total=len(local_analysis.get("issueWorkbench", [])) if isinstance(local_analysis, dict) else 0,
+            generated=len(cached["result"].get("issueOptimizationWorkbench", [])),
+            result=cached["result"],
+        )
+        return jsonify({"success": True, "taskId": task_id, "cached": True})
+
+    task_id = SHARED_STORE.create_ai_task(
+        shop_id,
+        username=username,
+        cache_key=cache_key,
+        issue_offset=issue_offset,
+        issue_limit=issue_limit,
+        stage="等待任务",
+        total=len(local_analysis.get("issueWorkbench", [])) if isinstance(local_analysis, dict) else 0,
+    )
+    thread = threading.Thread(
+        target=run_ai_analysis_task,
+        args=(task_id, shop_id, username, dict(p), issue_offset, issue_limit),
+        name=f"ai-analysis-{task_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    return jsonify({"success": True, "taskId": task_id, "cached": False})
+
+
+@app.route("/api/ai/tasks/<task_id>")
+@require_auth
+def ai_task_status(task_id):
+    task = SHARED_STORE.get_ai_task(task_id)
+    if not task or task.get("username") != current_ai_config_username():
+        return jsonify({"success": False, "error": "任务不存在"}), 404
+    return jsonify({"success": True, "task": serialize_ai_task(task)})
+
+
+@app.route("/api/ai/tasks/<task_id>/cancel", methods=["POST"])
+@require_auth
+def ai_task_cancel(task_id):
+    task = SHARED_STORE.get_ai_task(task_id)
+    if not task or task.get("username") != current_ai_config_username():
+        return jsonify({"success": False, "error": "任务不存在"}), 404
+    if task.get("status") in {"succeeded", "failed", "cancelled"}:
+        return jsonify({"success": True, "task": serialize_ai_task(task)})
+    SHARED_STORE.request_ai_task_cancel(task_id)
+    task = SHARED_STORE.get_ai_task(task_id)
+    return jsonify({"success": True, "task": serialize_ai_task(task)})
+
+
+@app.route("/api/ai/tasks/latest")
+@require_auth
+def ai_task_latest():
+    shop_id = request.args.get("shopId", "").strip()
+    if not shop_id:
+        return jsonify({"success": False, "error": "缺少店铺 ID"}), 400
+    task = SHARED_STORE.latest_ai_task(shop_id, current_ai_config_username())
+    return jsonify({"success": True, "task": serialize_ai_task(task)})
 
 
 if __name__ == "__main__":

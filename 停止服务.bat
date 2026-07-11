@@ -1,3 +1,5 @@
 @echo off
+setlocal EnableExtensions
 cd /d "%~dp0"
-call "stop_server.bat"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0stop_service_hidden.ps1"
+exit /b %ERRORLEVEL%

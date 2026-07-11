@@ -9,6 +9,8 @@ __pycache__/
 111/traces_*.json
 111/server.log
 data/
+.ui-test-data/
+ui-screenshots/
 *.log
 *.log.err
 *.pid

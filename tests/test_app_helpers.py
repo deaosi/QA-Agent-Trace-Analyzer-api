@@ -66,6 +66,14 @@ class AppHelperTests(unittest.TestCase):
         self.assertEqual(user["remark"], "系统默认管理员")
         self.assertTrue(user["hasPassword"])
 
+    def test_cookie_files_are_distinct_per_user(self):
+        alice = qa_app.cookie_file_for_user("alice")
+        bob = qa_app.cookie_file_for_user("bob")
+
+        self.assertNotEqual(alice, bob)
+        self.assertTrue(alice.startswith(os.path.abspath(qa_app.DATA_DIR)))
+        self.assertTrue(bob.startswith(os.path.abspath(qa_app.DATA_DIR)))
+
     def test_load_users_locks_default_admin(self):
         with tempfile.TemporaryDirectory() as tmp:
             qa_app.USERS_FILE = os.path.join(tmp, ".users.json")
@@ -183,4 +191,3 @@ class AppHelperTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

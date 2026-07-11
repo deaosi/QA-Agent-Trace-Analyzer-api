@@ -10,5 +10,6 @@ APP_DIR = os.path.join(BASE_DIR, "111")
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-from app import app  # noqa: E402
+from app import app, validate_startup_security  # noqa: E402
 
+validate_startup_security()

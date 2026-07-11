@@ -53,7 +53,8 @@ echo [2/3] Installing dependencies...
 echo [3/3] Deploy finished.
 echo.
 echo Initial admin username: %QA_ADMIN_USERNAME%
-echo Initial admin password: %QA_ADMIN_PASSWORD%
+echo Initial admin credentials are stored in .env.
+echo Do not share the .env file or print its contents in support logs.
 echo.
 echo Next step: run start_server.bat
 pause
