@@ -91,7 +91,62 @@ class LocalAnalysisV2GoldenTests(unittest.TestCase):
             issue = result["issueWorkbench"][0]
             for key in ("confidence", "confidenceLevel", "qualityDimensions", "ruleHits", "analysisVersion"):
                 self.assertIn(key, issue)
+            self.assertIn("conversationSummary", result)
+            self.assertIn("manualQueue", result)
             self.assertGreater(result["storeDiagnosis"]["healthScore"], 0)
+
+    def test_manual_queue_uses_mutually_exclusive_buckets(self):
+        queue = qa_app.build_manual_queue([
+            {
+                "id": "promise", "standardQuestion": "退款什么时候到账", "issueType": "高风险",
+                "priority": "高", "confidence": 94, "count": 1, "status": "待处理",
+                "ruleHits": [{"ruleId": "QA-PROMISE-001"}], "suggestedAction": "改话术",
+            },
+            {
+                "id": "review", "standardQuestion": "物流多久到", "issueType": "弱回复",
+                "priority": "中", "confidence": 58, "count": 8, "status": "待处理",
+                "ruleHits": [], "suggestedAction": "补知识",
+            },
+            {
+                "id": "batch", "standardQuestion": "如何退货", "issueType": "弱回复",
+                "priority": "中", "confidence": 82, "count": 3, "status": "待处理",
+                "ruleHits": [], "suggestedAction": "补知识",
+            },
+            {
+                "id": "done", "standardQuestion": "已完成问题", "issueType": "高风险",
+                "priority": "高", "confidence": 94, "count": 9, "status": "复查通过",
+                "ruleHits": [{"ruleId": "QA-PROMISE-001"}], "suggestedAction": "改话术",
+            },
+        ])
+        buckets = {item["issueId"]: item["bucket"] for item in queue}
+        self.assertEqual(buckets, {"promise": "立即处理", "review": "需要复核", "batch": "批量整改"})
+
+    def test_chat_records_returns_paginated_multi_turn_sessions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SharedStore(os.path.join(tmp, "shared.sqlite3"))
+            store.merge_traces("shop-1", [
+                {"id": "t1", "buyerAccount": "buyer-1", "time": 60_000, "question": "怎么退款", "content": "请从订单售后入口申请"},
+                {"id": "t2", "buyerAccount": "buyer-1", "time": 60_000 * 30, "question": "多久到账", "content": "预计三个工作日"},
+                {"id": "t3", "buyerAccount": "buyer-2", "time": 60_000 * 31, "question": "怎么发货", "content": "今日安排"},
+            ], fetched_by="test")
+            original_password = qa_app.ADMIN_PASSWORD
+            try:
+                qa_app.ADMIN_PASSWORD = ""
+                with patch.object(qa_app, "SHARED_STORE", store), patch.object(qa_app, "load_users", return_value={}):
+                    client = qa_app.app.test_client()
+                    multi = client.get("/api/chat-records?shopId=shop-1&conversationMode=true").get_json()
+                    self.assertTrue(multi["success"])
+                    self.assertEqual(multi["total"], 1)
+                    self.assertEqual(multi["sessions"][0]["turnCount"], 2)
+                    self.assertEqual([row["id"] for row in multi["sessions"][0]["records"]], ["t1", "t2"])
+
+                    all_sessions = client.get("/api/chat-records?shopId=shop-1&conversationMode=true&includeSingleTurns=true").get_json()
+                    self.assertEqual(all_sessions["total"], 2)
+
+                    detail = client.post("/api/issue-detail", json={"shopId": "shop-1", "traceIds": "t2,t1"}).get_json()
+                    self.assertEqual([row["id"] for row in detail["records"]], ["t1", "t2"])
+            finally:
+                qa_app.ADMIN_PASSWORD = original_password
 
     def test_issue_feedback_route_persists_current_user(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -131,6 +186,11 @@ class LocalAnalysisV2GoldenTests(unittest.TestCase):
             "判断正确",
             "标记误判",
             "需要复核",
+            "renderManualQueue",
+            "loadQaSessions",
+            "conversationMode",
+            "包含单轮风险记录",
+            "多轮质检会话",
         ):
             self.assertIn(token, html)
 

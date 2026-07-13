@@ -30,7 +30,7 @@
 - 会话 ID 由店铺、原始买家 ID、会话起始时间和首条 Trace ID 计算哈希，避免依赖截断文本。
 - 记录按时间升序排列；同一时间时按 Trace ID 排序，保证重跑结果稳定。
 
-`run_analysis()` 新增 `conversationSessions`，但保留原来的 `qaExamples`。问题簇样本增加会话元数据，以便详情优先加载多轮会话，而不是只取聚类命中的第一条 Trace。
+`run_analysis()` 新增 `conversationSummary`，但保留原来的 `qaExamples`。问题簇样本增加会话元数据，以便详情优先加载多轮会话，而不是只取聚类命中的第一条 Trace。完整会话由 `/api/chat-records?conversationMode=true` 按页生成，避免在每次分析结果中重复保存全部对话正文。
 
 ### 聊天记录与问题详情
 

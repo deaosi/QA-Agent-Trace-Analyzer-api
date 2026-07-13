@@ -20,6 +20,7 @@ from flask import Flask, has_request_context, jsonify, redirect, render_template
 from werkzeug.security import check_password_hash, generate_password_hash
 from storage import load_json as storage_load_json, save_json as storage_save_json
 from shared_store import SharedStore
+from conversation_sessions import build_conversation_sessions as group_conversation_sessions
 from local_analysis_v2 import (
     ANALYSIS_VERSION as LOCAL_ANALYSIS_VERSION,
     calculate_health_score,
@@ -1316,8 +1317,9 @@ def estimate_adoption_risk(issue_type, reasons, answer, record):
     return max(0, min(100, risk))
 
 
-def build_issue_workbench(traces, shop_id=""):
+def build_issue_workbench(traces, shop_id="", conversation_index=None):
     groups = []
+    conversation_index = conversation_index if isinstance(conversation_index, dict) else {}
     sorted_traces = sorted(
         (record for record in traces if isinstance(record, dict)),
         key=lambda record: str(record.get("id") or record.get("traceId") or ""),
@@ -1403,16 +1405,18 @@ def build_issue_workbench(traces, shop_id=""):
         group["adoptionRiskTotal"] += estimate_adoption_risk(issue_type, reasons, answer, record)
         for reason in reasons:
             group["reasons"][reason] += 1
-        if len(group["examples"]) < 5:
+        if len(group["examples"]) < 20:
             identity = extract_trace_identity(record)
+            trace_id = str(record.get("id") or record.get("traceId") or "")
             group["examples"].append({
-                "id": record.get("id", ""),
+                "id": trace_id,
                 "question": question[:240],
                 "answer": answer[:600],
                 "seller": record.get("sellerAccount", ""),
                 "type": record.get("type", ""),
                 "topicName": record.get("topicName", ""),
                 "identity": compact_identity(identity),
+                "conversation": conversation_index.get(trace_id, {}),
             })
         severity_order = {"未回复": 3, "高风险": 2, "弱回复": 1, "正常": 0}
         if severity_order.get(issue_type, 0) > severity_order.get(group["issueType"], 0):
@@ -1436,7 +1440,16 @@ def build_issue_workbench(traces, shop_id=""):
             issue["issueType"], issue["count"], issue["unresolvedCount"], issue["negativeCount"],
             confidence, rule_hits,
         )
-        sample = issue["examples"][0] if issue["examples"] else {}
+        examples = sorted(
+            issue["examples"],
+            key=lambda example: (
+                bool((example.get("conversation") or {}).get("isMultiTurn")),
+                int((example.get("conversation") or {}).get("endTime", 0) or 0),
+                str(example.get("id", "")),
+            ),
+            reverse=True,
+        )[:5]
+        sample = examples[0] if examples else {}
         action, suggestion = build_training_suggestion(
             issue["issueType"], issue["topic"], sample.get("question", ""), sample.get("answer", "")
         )
@@ -1492,7 +1505,7 @@ def build_issue_workbench(traces, shop_id=""):
             },
             "status": state,
             "feedback": feedback_map.get(issue_id),
-            "examples": issue["examples"],
+            "examples": examples,
         })
     return sorted(issues, key=lambda item: (-item["score"], -item["count"], item["topic"]))
 
@@ -1859,7 +1872,9 @@ def run_analysis(traces, shop_id=""):
         if examples:
             qa_examples.append({"topic": topic_name, "count": len(records), "examples": examples})
 
-    issue_workbench = build_issue_workbench(traces, shop_id)
+    conversation_sessions, conversation_index = build_conversation_workspace(traces, shop_id)
+    issue_workbench = build_issue_workbench(traces, shop_id, conversation_index)
+    manual_queue = build_manual_queue(issue_workbench)
     store_diagnosis = build_store_diagnosis(traces, issue_workbench)
     identity_insights = build_identity_insights(traces, issue_workbench)
 
@@ -1886,6 +1901,8 @@ def run_analysis(traces, shop_id=""):
         "topicInsights": topic_insights,
         "qaExamples": qa_examples,
         "issueWorkbench": issue_workbench,
+        "conversationSummary": conversation_summary(conversation_sessions),
+        "manualQueue": manual_queue,
         "storeDiagnosis": store_diagnosis,
         "identityInsights": identity_insights,
         "topKeywords": top_keywords,
@@ -1961,7 +1978,8 @@ def export_chat():
         if not isinstance(record, dict):
             continue
         question, answer = parse_conversation(record)
-        buyer = record.get("buyerAccount", "")
+        identity = extract_trace_identity(record)
+        buyer = identity.get("buyerId", "") or record.get("buyerAccount", "")
         seller = record.get("sellerAccount", "")
         topic = record.get("topicName", "")
         trace_id = record.get("id", "")
@@ -2020,6 +2038,9 @@ def chat_records():
         end_time = request.args.get("endTime", "")
         page_raw = request.args.get("page", 1)
         page_size_raw = request.args.get("pageSize", 50)
+        conversation_mode = request.args.get("conversationMode", "")
+        include_single_turns = request.args.get("includeSingleTurns", "")
+        search_term = request.args.get("search", "")
     else:
         data = request.get_json() or {}
         shop_id = str(data.get("shopId", "")).strip()
@@ -2027,6 +2048,9 @@ def chat_records():
         end_time = data.get("endTime", "")
         page_raw = data.get("page", 1)
         page_size_raw = data.get("pageSize", 50)
+        conversation_mode = data.get("conversationMode", "")
+        include_single_turns = data.get("includeSingleTurns", "")
+        search_term = data.get("search", "")
 
     try:
         page = max(1, min(int(page_raw), 1000000))
@@ -2051,6 +2075,35 @@ def chat_records():
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) >= begin_ts]
     if end_ts is not None:
         traces = [t for t in traces if isinstance(t, dict) and t.get("time", 0) <= end_ts]
+
+    conversation_mode = str(conversation_mode).strip().lower() in {"1", "true", "yes", "on"}
+    include_single_turns = str(include_single_turns).strip().lower() in {"1", "true", "yes", "on"}
+    search_term = str(search_term or "").strip().lower()
+    if conversation_mode:
+        sessions, _ = build_conversation_workspace(traces, shop_id)
+        if not include_single_turns:
+            sessions = [session for session in sessions if session.get("isMultiTurn")]
+        if search_term:
+            def session_matches(session):
+                values = [session.get("buyerId", "")]
+                for row in session.get("records", []):
+                    values.extend((row.get("question", ""), row.get("answer", ""), row.get("topic", "")))
+                return any(search_term in str(value or "").lower() for value in values)
+
+            sessions = [session for session in sessions if session_matches(session)]
+        total = len(sessions)
+        start = (page - 1) * page_size
+        page_sessions = sessions[start:start + page_size]
+        return jsonify({
+            "success": True,
+            "mode": "conversation",
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "totalPages": max(1, (total + page_size - 1) // page_size),
+            "summary": conversation_summary(sessions),
+            "sessions": [public_conversation_session(session) for session in page_sessions],
+        })
 
     total = len(traces)
     traces = sorted(traces, key=lambda t: t.get("time", 0), reverse=True)
@@ -2133,7 +2186,8 @@ def issue_detail():
             continue
         seen.add(tid)
         question, answer = parse_conversation(record)
-        buyer = record.get("buyerAccount", "")
+        identity = extract_trace_identity(record)
+        buyer = identity.get("buyerId", "") or record.get("buyerAccount", "")
         seller = record.get("sellerAccount", "")
         topic = record.get("topicName", "")
         product_info = record.get("productInfo", {}) if isinstance(record.get("productInfo"), dict) else {}
@@ -2141,11 +2195,7 @@ def issue_detail():
         sku_id = product_info.get("skuId", "") or ""
         spu_id = product_info.get("spuId", "") or ""
         ts = record.get("time", 0)
-        try:
-            dt_str = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            dt_str = str(ts)
-        identity = extract_trace_identity(record)
+        dt_str = format_trace_time(ts)
 
         records.append({
             "id": tid,
@@ -2165,8 +2215,8 @@ def issue_detail():
             "rawTime": ts,
         })
 
-    # Sort by time descending
-    records.sort(key=lambda r: r.get("rawTime", 0), reverse=True)
+    # A conversation needs chronological order for a useful review.
+    records.sort(key=lambda r: r.get("rawTime", 0))
     for r in records:
         r.pop("rawTime", None)
 
@@ -3378,6 +3428,131 @@ def build_ai_cache_key(shop_id, traces, local_analysis, cfg, issue_offset, issue
         "traces": traces,
         "localAnalysis": local,
     }
+
+
+def format_trace_time(timestamp):
+    try:
+        return datetime.fromtimestamp(int(timestamp or 0) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return str(timestamp or "")
+
+
+def build_conversation_workspace(traces, shop_id=""):
+    """Build reusable conversation sessions and a trace-to-session lookup."""
+    rows = []
+    for record in traces:
+        if not isinstance(record, dict):
+            continue
+        question, answer = parse_conversation(record)
+        trace_id = str(record.get("id") or record.get("traceId") or "").strip()
+        if not trace_id or not question:
+            continue
+        identity = compact_identity(extract_trace_identity(record))
+        rows.append({
+            "traceId": trace_id,
+            "buyerIdRaw": identity.get("buyerIdRaw", ""),
+            "buyerId": identity.get("buyerId", ""),
+            "timestamp": record.get("time", 0),
+            "time": format_trace_time(record.get("time", 0)),
+            "question": question[:500],
+            "answer": answer[:1000],
+            "topic": str(record.get("topicName", "") or "")[:50],
+            "identity": identity,
+        })
+
+    sessions = group_conversation_sessions(rows, shop_id)
+    index = {}
+    for session in sessions:
+        summary = {
+            "id": session["id"],
+            "turnCount": session["turnCount"],
+            "isMultiTurn": session["isMultiTurn"],
+            "traceIds": session["traceIds"],
+            "startTime": session["startTime"],
+            "endTime": session["endTime"],
+            "buyerId": session.get("buyerId", ""),
+        }
+        for trace_id in session["traceIds"]:
+            index[trace_id] = summary
+    return sessions, index
+
+
+def conversation_summary(sessions):
+    total = len(sessions)
+    multi_turn = [session for session in sessions if session.get("isMultiTurn")]
+    return {
+        "totalSessions": total,
+        "multiTurnSessions": len(multi_turn),
+        "multiTurnTraceCount": sum(session.get("turnCount", 0) for session in multi_turn),
+        "singleTurnSessions": total - len(multi_turn),
+    }
+
+
+def public_conversation_session(session):
+    records = []
+    topics = []
+    for row in session.get("records", []):
+        topic = str(row.get("topic", "") or "")
+        if topic and topic not in topics:
+            topics.append(topic)
+        records.append({
+            "id": row.get("traceId", ""),
+            "time": row.get("time") or format_trace_time(row.get("timestamp", 0)),
+            "question": row.get("question", ""),
+            "answer": row.get("answer", ""),
+            "topic": topic,
+            "identity": row.get("identity", {}),
+        })
+    return {
+        "id": session.get("id", ""),
+        "buyer": session.get("buyerId", ""),
+        "turnCount": session.get("turnCount", 0),
+        "isMultiTurn": bool(session.get("isMultiTurn")),
+        "startTime": format_trace_time(session.get("startTime", 0)),
+        "endTime": format_trace_time(session.get("endTime", 0)),
+        "topics": topics,
+        "records": records,
+    }
+
+
+def build_manual_queue(issue_workbench):
+    """Create mutually exclusive, action-oriented work queues from issue clusters."""
+    resolved_statuses = {"已补知识", "已优化话术", "复查通过", "忽略"}
+    bucket_order = {"立即处理": 0, "需要复核": 1, "批量整改": 2}
+    queue = []
+    for issue in issue_workbench or []:
+        if not isinstance(issue, dict) or issue.get("status") in resolved_statuses:
+            continue
+        rule_ids = {str(hit.get("ruleId", "")) for hit in issue.get("ruleHits", []) if isinstance(hit, dict)}
+        confidence = int(issue.get("confidence", 0) or 0)
+        feedback = issue.get("feedback") if isinstance(issue.get("feedback"), dict) else {}
+        if (
+            (issue.get("issueType") == "高风险" and confidence >= 85)
+            or (issue.get("priority") == "高" and "QA-PROMISE-001" in rule_ids)
+        ):
+            bucket, reason = "立即处理", "高风险且证据充分"
+        elif feedback.get("verdict") == "needs_review" or confidence < 70:
+            bucket, reason = "需要复核", "证据不足或已标记人工复核"
+        elif issue.get("priority") in {"高", "中"} and int(issue.get("count", 0) or 0) >= 3:
+            bucket, reason = "批量整改", "同类问题重复出现，适合批量处理"
+        else:
+            continue
+        queue.append({
+            "issueId": issue.get("id", ""),
+            "bucket": bucket,
+            "reason": reason,
+            "title": issue.get("standardQuestion") or issue.get("topic") or "待处理问题",
+            "issueType": issue.get("issueType", ""),
+            "priority": issue.get("priority", ""),
+            "confidence": confidence,
+            "count": int(issue.get("count", 0) or 0),
+            "suggestedAction": issue.get("suggestedAction", ""),
+            "status": issue.get("status", "待处理"),
+        })
+    return sorted(
+        queue,
+        key=lambda item: (bucket_order[item["bucket"]], -item["confidence"], -item["count"], item["issueId"]),
+    )
     raw = json.dumps(cache_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
