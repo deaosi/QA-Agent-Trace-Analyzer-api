@@ -191,6 +191,10 @@ class LocalAnalysisV2GoldenTests(unittest.TestCase):
             "conversationMode",
             "包含单轮风险记录",
             "多轮质检会话",
+            "qualityDrawer",
+            "openQualityDrawer",
+            "renderTypicalQaPage",
+            "典型 Q&A",
         ):
             self.assertIn(token, html)
 
